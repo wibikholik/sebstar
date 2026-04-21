@@ -3,7 +3,13 @@ import React from 'react';
 
 export default function TabLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: 'blue' }}>
+    // Gabungkan semua opsi di dalam satu screenOptions
+    <Tabs 
+      screenOptions={{ 
+        headerShown: false,           // Menghilangkan header
+        tabBarActiveTintColor: 'blue' // Warna saat tab aktif
+      }}
+    >
       <Tabs.Screen 
         name="index" 
         options={{ title: 'Home' }} 

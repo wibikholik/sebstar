@@ -1,11 +1,16 @@
-// axiosConfig.ts
+// src/api/axiosConfig.ts
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const api = axios.create({
-  baseURL: 'http://10.253.108.247:8000/api',
+  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  }
 });
 
+// Interceptor: Menambahkan token secara otomatis ke setiap request
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('userToken');
   if (token) {

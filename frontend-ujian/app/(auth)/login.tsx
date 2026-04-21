@@ -10,9 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform 
 } from 'react-native';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+
+// SESUAIKAN PATH INI dengan lokasi file axiosConfig.ts kamu
+import api from '../../src/api/axiosConfig'; 
 
 export default function LoginScreen() {
   const [nis, setNis] = useState('');
@@ -21,50 +23,43 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    // Validasi input
+    // 1. Validasi input
     if (!nis || !password) {
       Alert.alert('Peringatan', 'NIS dan Password harus diisi');
       return;
     }
 
     setLoading(true);
-    console.log("Mencoba login dengan NIS:", nis); // Log untuk debug
 
     try {
-      const response = await axios.post('http://10.253.108.247:8000/api/login', {
+      // 2. Request API menggunakan instance 'api'
+      // URL sudah otomatis menggunakan baseURL dari .env
+      const response = await api.post('/login', {
         nis: nis,
         password: password,
-      }, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // Timeout 10 detik agar tidak "gantung"
       });
 
-      console.log("Login Berhasil! Token diterima.");
+      console.log("Login Berhasil!");
 
-      // Simpan token ke storage HP
+      // 3. Simpan token
       await AsyncStorage.setItem('userToken', response.data.access_token);
       
-      // Beri jeda sedikit agar navigasi lebih stabil
-      setTimeout(() => {
-        router.replace('/(tabs)'); 
-      }, 500);
+      // 4. Navigasi
+      router.replace('/(tabs)'); 
 
     } catch (error: any) {
       setLoading(false);
       
-      // Log detail error ke terminal untuk membantumu melacak masalah
+      // 5. Error handling yang informatif
       if (error.response) {
+        // Server merespon dengan status selain 2xx
         console.log("Error Status:", error.response.status);
-        console.log("Error Data:", error.response.data);
         Alert.alert('Login Gagal', error.response.data.message || 'NIS/Password salah');
       } else if (error.request) {
+        // Request dibuat tapi tidak ada respon (cek koneksi/IP)
         console.log("Error Request:", error.request);
-        Alert.alert('Gagal', 'Server tidak merespons. Cek IP/Wi-Fi.');
+        Alert.alert('Gagal', 'Server tidak merespons. Pastikan HP dan Laptop di Wi-Fi yang sama.');
       } else {
-        console.log("Error:", error.message);
         Alert.alert('Error', 'Terjadi kesalahan sistem');
       }
     }
@@ -124,8 +119,7 @@ const styles = StyleSheet.create({
     margin: 20,
     backgroundColor: '#fff',
     borderRadius: 15,
-    elevation: 5, // Android shadow
-    // Menggunakan syntax shadow standar agar tidak ada warning deprecated
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
