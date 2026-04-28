@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login Sistem Ujian SMK</title>
+    <title>Login Sistem Ujian SMK kunyuk</title>
 </head>
 <body>
     <div style="margin: 100px auto; width: 300px; text-align: center;">
