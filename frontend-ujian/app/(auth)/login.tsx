@@ -1,20 +1,21 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  Alert, 
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform 
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
-// SESUAIKAN PATH INI dengan lokasi file axiosConfig.ts kamu
-import api from '../../src/api/axiosConfig'; 
+import api from '../../src/api/axiosConfig';
 
 export default function LoginScreen() {
   const [nis, setNis] = useState('');
@@ -23,7 +24,6 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    // 1. Validasi input
     if (!nis || !password) {
       Alert.alert('Peringatan', 'NIS dan Password harus diisi');
       return;
@@ -32,117 +32,148 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // 2. Request API menggunakan instance 'api'
-      // URL sudah otomatis menggunakan baseURL dari .env
       const response = await api.post('/login', {
-        nis: nis,
-        password: password,
+        nis,
+        password,
       });
 
-      console.log("Login Berhasil!");
-
-      // 3. Simpan token
       await AsyncStorage.setItem('userToken', response.data.access_token);
-      
-      // 4. Navigasi
-      router.replace('/(tabs)'); 
 
+      router.replace('/(tabs)');
     } catch (error: any) {
       setLoading(false);
-      
-      // 5. Error handling yang informatif
+
       if (error.response) {
-        // Server merespon dengan status selain 2xx
-        console.log("Error Status:", error.response.status);
         Alert.alert('Login Gagal', error.response.data.message || 'NIS/Password salah');
       } else if (error.request) {
-        // Request dibuat tapi tidak ada respon (cek koneksi/IP)
-        console.log("Error Request:", error.request);
-        Alert.alert('Gagal', 'Server tidak merespons. Pastikan HP dan Laptop di Wi-Fi yang sama.');
+        Alert.alert('Gagal', 'Server tidak merespons');
       } else {
-        Alert.alert('Error', 'Terjadi kesalahan sistem');
+        Alert.alert('Error', 'Terjadi kesalahan');
       }
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <LinearGradient
+      colors={['#c91313', '#ff4d4d']}
       style={styles.container}
     >
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>Sebstar Login</Text>
-        <Text style={styles.subtitle}>Masukkan NIS dan Password</Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ width: '100%' }}
+      >
+        <View style={styles.card}>
 
-        <TextInput 
-          style={styles.input} 
-          placeholder="NIS" 
-          value={nis} 
-          onChangeText={setNis}
-          keyboardType="numeric"
-          autoCapitalize="none"
-        />
-        
-        <TextInput 
-          style={styles.input} 
-          placeholder="Password" 
-          value={password} 
-          onChangeText={setPassword}
-          secureTextEntry 
-          autoCapitalize="none"
-        />
+          {/* LOGO / TITLE */}
+          <View style={styles.header}>
+            <Ionicons name="lock-closed" size={40} color="#c91313" />
+            <Text style={styles.title}>SEBSTAR</Text>
+            <Text style={styles.subtitle}>Masuk ke akun kamu</Text>
+          </View>
 
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>MASUK</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          {/* INPUT NIS */}
+          <View style={styles.inputGroup}>
+            <Ionicons name="person" size={20} color="#888" style={styles.icon} />
+            <TextInput 
+              placeholder="NIS"
+              value={nis}
+              onChangeText={setNis}
+              style={styles.input}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* INPUT PASSWORD */}
+          <View style={styles.inputGroup}>
+            <Ionicons name="lock-closed" size={20} color="#888" style={styles.icon} />
+            <TextInput 
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={styles.input}
+            />
+          </View>
+
+          {/* BUTTON */}
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>MASUK</Text>
+            )}
+          </TouchableOpacity>
+
+        </View>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    backgroundColor: '#f8f9fa' 
-  },
-  formContainer: {
-    padding: 25,
-    margin: 20,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, color: '#333' },
-  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 30, color: '#666' },
-  input: { 
-    borderWidth: 1, 
-    borderColor: '#ddd', 
-    padding: 15, 
-    marginBottom: 15, 
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    fontSize: 16
-  },
-  button: { 
-    backgroundColor: '#007bff', 
-    padding: 15, 
-    borderRadius: 10,
+  container: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10
   },
-  buttonDisabled: { backgroundColor: '#99ccff' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+
+  card: {
+    width: '90%',
+    backgroundColor: '#fff',
+    padding: 25,
+    borderRadius: 20,
+    elevation: 10,
+  },
+
+  header: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+
+  icon: {
+    marginRight: 8,
+  },
+
+  input: {
+    flex: 1,
+    padding: 12,
+  },
+
+  button: {
+    backgroundColor: '#c91313',
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });
