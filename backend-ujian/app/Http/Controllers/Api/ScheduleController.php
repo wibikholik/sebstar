@@ -4,25 +4,31 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Queue\Events\JobAttempted;
-use Illuminate\Support\Facades\Log;
-use App\Models\Schedule; // Pastikan model Schedule di-import
+use App\Models\Schedule;
+use App\Models\StudentAnswer;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 class ScheduleController extends Controller
 {
-   public function index() {
-    // Gunakan 'with' untuk subject dan classroom
-    $jadwal = Schedule::with(['subject', 'classroom'])->get();
+    public function index() 
+    {
+        // 1. Ambil semua jadwal dengan relasi subject dan classroom
+        $jadwal = Schedule::with(['subject', 'classroom'])->get();
 
-    // Opsional: Jika ingin menggabungkan data guru agar langsung bisa dibaca di frontend
-    $jadwal->map(function ($item) {
-        $item->teachers_data = \App\Models\User::whereIn('id', $item->teacher_ids ?? [])->get();
-        return $item;
-    });
+        // 2. Gunakan map untuk melengkapi data per item
+        $jadwal->map(function ($item) {
+            // A. Ambil data guru
+            $item->teachers_data = User::whereIn('id', $item->teacher_ids ?? [])->get();
+            
+            // B. Cek apakah user sudah mengerjakan ujian ini
+            $item->is_finished = StudentAnswer::where('user_id', Auth::id())
+                                              ->where('schedule_id', $item->id)
+                                              ->where('is_finished', true)
+                                              ->exists();
+            return $item;
+        });
 
-    return response()->json([
-        'success' => true,
-        'data' => $jadwal
-    ]);
-   }
+        return response()->json($jadwal, 200);
+    }
 }

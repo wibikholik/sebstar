@@ -17,7 +17,7 @@
             <p>TOTAL PENGAWAS</p>
         </div>
         <div class="stat-card">
-            <h2 style="font-size: 28px;">125</h2> <p>TOTAL UJIAN</p>
+            <h2 style="font-size: 28px;">{{ $jml_schedule }}</h2> <p>TOTAL JADWAL UJIAN</p>
         </div>
     </div>
 
@@ -26,15 +26,15 @@
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
             <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
                 <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Total Mata Pelajaran</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px;">12</h2>
+                <h2 style="margin: 5px 0 0; font-size: 32px;">{{ $jml_mata_pelajaran }}</h2>
             </div>
             <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
                 <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Total Kelas</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px;">12</h2>
+                <h2 style="margin: 5px 0 0; font-size: 32px;">{{ $jml_kelas }}</h2>
             </div>
             <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
                 <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Ujian Hari Ini</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px; color: var(--red-sebstar);">12</h2>
+                <h2 style="margin: 5px 0 0; font-size: 32px; color: var(--red-sebstar);">{{ $jml_ujian_hari_ini }}</h2>
             </div>
         </div>
     </div>
@@ -68,7 +68,7 @@
                 type: 'bar',
                 data: {
                     labels: ['Jan', 'Feb', 'Mar'],
-                    datasets: [{ label: 'Soal', data: [12, 19, 10], backgroundColor: '#cd0000', borderRadius: 5 }]
+                    datasets: [{ label: 'Soal', data: [{{ $jml_schedule }}], backgroundColor: '#cd0000', borderRadius: 5 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });

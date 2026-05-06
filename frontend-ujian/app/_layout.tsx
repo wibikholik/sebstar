@@ -10,27 +10,43 @@ export default function RootLayout() {
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [segments]); 
 
   const checkAuth = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       const inAuthGroup = segments[0] === '(auth)';
+      
+      // LOG DEBUGGING: Lihat apa yang terjadi
+      console.log("Token:", token, "Segments:", segments);
 
+      // KITA TAMBAHKAN LOGIKA: 
+      // Jangan melakukan apa-apa jika user sudah berada di halaman yang dituju
       if (!token && !inAuthGroup) {
+        // Jika belum login dan tidak di grup auth, redirect ke login
         router.replace('/(auth)/login');
       } else if (token && inAuthGroup) {
+        // Jika sudah login tapi masih di grup auth, redirect ke tabs
         router.replace('/(tabs)');
       }
+      
+      // Jika token ada ATAU user sedang menuju halaman ujian/selesai, 
+      // JANGAN redirect (biarkan navigasi berjalan).
+      
+    } catch (e) {
+      console.error("Auth check error:", e);
     } finally {
       setIsReady(true);
     }
   };
 
   if (!isReady) {
-    return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator /></View>;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
-  // Tambahkan key={segments[0]} agar layout me-render ulang saat pindah grup
-  return <Slot key={segments[0]} />;
+  return <Slot />;
 }

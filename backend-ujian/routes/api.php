@@ -1,28 +1,35 @@
 <?php
 
-
-
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ScheduleController;
 
 // --- 1. RUTE PUBLIK ---
-// Siswa tidak perlu token untuk login
 Route::post('/login', [AuthController::class, 'login']);
 
 // --- 2. RUTE TERLINDUNGI (Wajib Token) ---
-// Gunakan middleware 'auth:sanctum' sebagai satpam
 Route::middleware('auth:sanctum')->group(function () {
     
-    // Auth: Mengambil profil & logout
+    // Auth
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     
-    // Jadwal: Mengambil daftar ujian yang aktif
+    // Jadwal
     Route::get('/jadwal', [ScheduleController::class, 'index']);
     
-    // Ujian: Mengambil soal
-    Route::get('/ambil-soal/{exam_id}', [ExamController::class, 'getQuestions']);
+    // Ujian & Soal
+    Route::post('/ujian/{id}/verify-token', [ExamController::class, 'verifyToken']);
+    Route::get('/ujian/{id}/soal', [ExamController::class, 'getSoal']);
+    Route::post('/ujian/{id}/submit-answer', [ExamController::class, 'submitAnswer']);
+    
+    // FIX: Perbaikan Route agar cocok dengan pemanggilan di Frontend
+    Route::post('/ujian/{id}/finish', [ExamController::class, 'finishExam']); 
+    
+    // FIX: Route History yang sebelumnya tidak ada
+    Route::get('/ujian/history', [ExamController::class, 'getHistory']);
+    
+    // Hasil
+    Route::get('/ujian/{id}/hasil', [ExamController::class, 'getResult']);
     
 });

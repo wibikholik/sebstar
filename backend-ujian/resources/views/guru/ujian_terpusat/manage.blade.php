@@ -56,7 +56,7 @@
                         {{-- Jika Ada Gambar --}}
                         @if($q->question_image)
                         <div style="margin: 10px 0;">
-                            <img src="{{ asset('storage/' . $q->question_image) }}" alt="Gambar Soal" 
+                            <img src="{{ asset('storage/app/public/uploads/' . $q->question_image) }}" alt="Gambar Soal" 
                                  style="max-width: 200px; border-radius: 8px; border: 1px solid var(--border-color);">
                         </div>
                         @endif

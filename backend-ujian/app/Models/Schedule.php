@@ -24,7 +24,10 @@ public function teachers()
 public function subject() {
     return $this->belongsTo(Subject::class);
 }
-
+public function studentAnswers()
+{
+    return $this->hasMany(StudentAnswer::class, 'schedule_id');
+}
 
 public function classroom() {
     return $this->belongsTo(Classroom::class);

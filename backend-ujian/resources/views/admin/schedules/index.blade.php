@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Manajemen Kelas & Jurusan')
+@section('title', 'Manajemen Jadwal Ujian')
 @section('content')
 <div class="content-box" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
