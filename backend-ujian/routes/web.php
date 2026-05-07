@@ -16,7 +16,7 @@ use App\Http\Controllers\Admin\ScheduleController;
 
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 /// Group untuk Admin
