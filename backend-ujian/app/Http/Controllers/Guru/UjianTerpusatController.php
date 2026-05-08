@@ -29,7 +29,8 @@ class UjianTerpusatController extends Controller
     {
         $schedule = Schedule::with(['subject', 'classroom'])->findOrFail($schedule_id);
 
-        $questions = Question::where('subject_id', $schedule->subject_id)
+        // PERBAIKAN: Filter berdasarkan schedule_id agar tidak bercampur dengan jadwal lain
+        $questions = Question::where('schedule_id', $schedule_id)
                              ->where('user_id', auth()->id())
                              ->latest()
                              ->get();
@@ -49,6 +50,7 @@ class UjianTerpusatController extends Controller
     {
         $request->validate([
             'subject_id' => 'required',
+            'schedule_id' => 'required', // Tambahkan validasi schedule_id
             'type' => 'required|in:pg,essay',
             'question_text' => 'required',
             'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
@@ -56,6 +58,7 @@ class UjianTerpusatController extends Controller
 
         $data = [
             'subject_id'     => $request->subject_id,
+            'schedule_id'    => $request->schedule_id, // PERBAIKAN: Simpan schedule_id
             'user_id'        => auth()->id(),
             'type'           => $request->type,
             'question_text'  => $request->question_text,
@@ -81,7 +84,6 @@ class UjianTerpusatController extends Controller
     public function edit(Request $request, $id)
     {
         $question = Question::findOrFail($id);
-        // Tangkap schedule_id dari URL agar saat update bisa kembali ke halaman manage
         $schedule_id = $request->schedule_id;
         
         return view('guru.ujian_terpusat.edit', compact('question', 'schedule_id'));
@@ -103,6 +105,11 @@ class UjianTerpusatController extends Controller
             'correct_answer' => ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay,
         ];
 
+        // Opsional: Jika ingin mengizinkan pindah jadwal saat edit (biasanya tidak perlu)
+        if ($request->has('schedule_id')) {
+            $data['schedule_id'] = $request->schedule_id;
+        }
+
         if ($request->hasFile('question_image')) {
             if ($question->question_image) {
                 Storage::disk('public')->delete($question->question_image);
@@ -122,15 +129,13 @@ class UjianTerpusatController extends Controller
 
         $question->update($data);
 
-        // Redirect ke halaman manage berdasarkan schedule_id yang dikirim dari form edit
-      if ($request->has('schedule_id') && $request->schedule_id != null) {
-        return redirect()->route('guru.ujian-terpusat.manage', $request->schedule_id)
-                         ->with('success', 'Soal berhasil diperbarui!');
-    }
+        if ($request->has('schedule_id') && $request->schedule_id != null) {
+            return redirect()->route('guru.ujian-terpusat.manage', $request->schedule_id)
+                             ->with('success', 'Soal berhasil diperbarui!');
+        }
 
-    // Jika schedule_id tidak ada, paksa kembali ke index jadwal daripada stuck di edit
-    return redirect()->route('guru.ujian-terpusat.index')
-                     ->with('success', 'Soal diperbarui, kembali ke daftar jadwal.');
+        return redirect()->route('guru.ujian-terpusat.index')
+                         ->with('success', 'Soal diperbarui.');
     }
 
     public function destroy($id)

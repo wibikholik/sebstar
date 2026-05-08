@@ -22,4 +22,7 @@ class RoleMiddleware
 
         return $next($request);
     }
-}
+    protected $except = [
+    'api/*', // Ini akan mengecualikan semua route API dari pengecekan CSRF
+];
+}   

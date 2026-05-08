@@ -27,8 +27,8 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 12px;">
-                    {{-- Opsional: Hitung jumlah soal yang sudah ada --}}
-                    <strong>{{ $item->subject->questions_count ?? 0 }}</strong> Soal Terinput
+                    {{-- Menghitung soal yang memiliki schedule_id ini --}}
+                    <strong>{{ \App\Models\Question::where('schedule_id', $item->id)->count() }}</strong> Soal Terinput
                 </div>
                 <a href="{{ route('guru.ujian-terpusat.manage', $item->id) }}" class="btn-add" style="text-decoration: none; padding: 8px 15px; font-size: 13px;">
                     Kelola Soal

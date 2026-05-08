@@ -3,6 +3,12 @@
 @section('title', 'Kelola Soal: ' . $schedule->subject->name)
 
 @section('content')
+<div style="margin-bottom: 15px;">
+    <a href="{{ route('guru.ujian-terpusat.index') }}" style="text-decoration: none; color: var(--text-gray); font-size: 14px; display: flex; align-items: center; gap: 5px; font-weight: 600;">
+        <span style="font-size: 18px;">←</span> Kembali ke Daftar Jadwal
+    </a>
+</div>
+
 <div class="content-box" style="margin-bottom: 25px; border-left: 5px solid var(--red-sebstar);">
     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
@@ -28,7 +34,7 @@
 
 <div class="content-box">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h4 style="margin: 0;">Daftar Soal Terinput</h4>
+        <h4 style="margin: 0;">Daftar Soal Terinput (Sesi Ini)</h4>
         <span style="background: #f0f2f5; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">
             Total: {{ $questions->count() }} Soal
         </span>
@@ -53,15 +59,13 @@
                             {{ $q->question_text }}
                         </div>
                         
-                        {{-- Jika Ada Gambar --}}
                         @if($q->question_image)
                         <div style="margin: 10px 0;">
-                            <img src="{{ asset('storage/app/public/uploads/' . $q->question_image) }}" alt="Gambar Soal" 
+                            <img src="{{ asset('storage/' . $q->question_image) }}" alt="Gambar Soal" 
                                  style="max-width: 200px; border-radius: 8px; border: 1px solid var(--border-color);">
                         </div>
                         @endif
 
-                        {{-- Jika Tipe PG, Tampilkan Opsi Singkat --}}
                         @if($q->type == 'pg')
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; font-size: 12px; color: var(--text-gray); background: #f8f9fa; padding: 10px; border-radius: 8px;">
                             <div><strong>A.</strong> {{ Str::limit($q->option_a, 30) }}</div>
@@ -87,9 +91,8 @@
                     </td>
                     <td style="text-align: center; vertical-align: top; padding-top: 15px;">
                         <div style="display: flex; gap: 10px; justify-content: center;">
-                         <a href="{{ route('guru.ujian-terpusat.edit', [$q->id, 'schedule_id' => $schedule->id]) }}" class="btn-edit">
-    Edit
-</a>
+                            <a href="{{ route('guru.ujian-terpusat.edit', [$q->id, 'schedule_id' => $schedule->id]) }}" style="text-decoration: none; color: #1565c0; font-weight: 600; font-size: 13px;">Edit</a>
+                            
                             <form action="{{ route('guru.ujian-terpusat.destroy', $q->id) }}" method="POST" onsubmit="return confirm('Hapus soal ini?')">
                                 @csrf
                                 @method('DELETE')
@@ -101,18 +104,12 @@
                 @empty
                 <tr>
                     <td colspan="4" style="text-align: center; padding: 50px; color: var(--text-gray);">
-                        Belum ada soal untuk mata pelajaran ini. Silakan klik <strong>Tambah Soal</strong>.
+                        Belum ada soal untuk jadwal ini. Silakan klik <strong>Tambah Soal</strong>.
                     </td>
                 </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
-
-    <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-        <a href="{{ route('guru.ujian-terpusat.index') }}" style="text-decoration: none; color: var(--text-gray); font-size: 14px; font-weight: 600;">
-            ← Kembali ke Jadwal Ujian
-        </a>
     </div>
 </div>
 @endsection

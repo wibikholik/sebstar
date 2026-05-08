@@ -12,6 +12,7 @@ class Question extends Model
     protected $fillable = [
         'subject_id',
         'user_id',
+        'schedule_id', // Tambahkan schedule_id ke fillable agar bisa diisi saat create/update
         'type',
         'question_text',
         'question_image',

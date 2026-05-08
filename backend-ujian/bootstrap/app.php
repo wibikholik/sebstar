@@ -12,9 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 1. Tambahkan alias middleware kamu yang sudah ada
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
+
+        // 2. MENGATASI CORS: Izinkan API agar bisa diakses dari browser/frontend
+        // Ini akan secara otomatis mengatur header Access-Control-Allow-Origin
+        $middleware->validateCsrfTokens(except: [
+            'api/*', // Kecualikan semua route API dari pengecekan CSRF
+        ]);
+
+        // Jika kamu ingin mengaktifkan fitur stateful untuk Sanctum/API
+        $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

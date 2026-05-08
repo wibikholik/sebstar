@@ -5,10 +5,17 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ScheduleController;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
+
 // --- 1. RUTE PUBLIK ---
+// Pastikan rute ini bisa diakses tanpa proteksi apapun
 Route::post('/login', [AuthController::class, 'login']);
 
-// --- 2. RUTE TERLINDUNGI (Wajib Token) ---
+// --- 2. RUTE TERLINDUNGI (Wajib Token Sanctum) ---
 Route::middleware('auth:sanctum')->group(function () {
     
     // Auth
@@ -23,13 +30,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ujian/{id}/soal', [ExamController::class, 'getSoal']);
     Route::post('/ujian/{id}/submit-answer', [ExamController::class, 'submitAnswer']);
     
-    // FIX: Perbaikan Route agar cocok dengan pemanggilan di Frontend
+    // Finish Exam
     Route::post('/ujian/{id}/finish', [ExamController::class, 'finishExam']); 
     
-    // FIX: Route History yang sebelumnya tidak ada
+    // History Ujian
     Route::get('/ujian/history', [ExamController::class, 'getHistory']);
     
-    // Hasil
+    // Hasil Ujian
     Route::get('/ujian/{id}/hasil', [ExamController::class, 'getResult']);
     
 });
