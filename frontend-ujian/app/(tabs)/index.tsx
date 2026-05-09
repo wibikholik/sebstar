@@ -1,143 +1,195 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, StatusBar, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import api from '../../src/api/axiosConfig'; // Sesuaikan path ini
+import api from '../../src/api/axiosConfig'; 
+import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
   const [jadwal, setJadwal] = useState([]);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State untuk Modal Token
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedExam, setSelectedExam] = useState<any>(null);
+  const [tokenInput, setTokenInput] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
-    fetchJadwal();
+    fetchData();
   }, []);
 
-  const fetchJadwal = async () => {
+  const fetchData = async () => {
     try {
       const response = await api.get('/jadwal');
-      // Pastikan backend mengembalikan array data
-      setJadwal(response.data.data || response.data);
-    } catch (error: any) {
-      if (error.response?.status === 401) {
-        handleLogout();
-      } else {
-        Alert.alert('Gagal', 'Gagal memuat jadwal. Cek koneksi Anda.');
+      setJadwal(response.data.data);
+      if (response.data.user) {
+        setUser(response.data.user);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
       }
+    } catch (error: any) {
+      const localUser = await AsyncStorage.getItem('userData');
+      if (localUser) setUser(JSON.parse(localUser));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchJadwal();
-  }, []);
+  const handleOpenTokenModal = (exam: any) => {
+    setSelectedExam(exam);
+    setTokenInput('');
+    setModalVisible(true);
+  };
 
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem('userToken');
-    router.replace('/(auth)/login');
+  const handleVerifyToken = async () => {
+    if (!tokenInput) return Alert.alert('Error', 'Masukkan token ujian!');
+    
+    setVerifying(true);
+    try {
+      await api.post(`/ujian/${selectedExam.id}/verify-token`, { token: tokenInput });
+      setModalVisible(false);
+      router.push({
+        pathname: '/ujian/petunjuk',
+        params: { id: selectedExam.id, token: tokenInput }
+      });
+    } catch (e: any) {
+      Alert.alert('Gagal', e.response?.data?.message || 'Token tidak valid');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const renderJadwal = ({ item }: { item: any }) => {
-    // 1. Logika Status
-    const isFinished = item.is_finished === true || item.is_finished === 1;
+    const isFinished = item.is_finished;
     const isActive = item.status === 'aktif' && !isFinished;
-    
-    // 2. Styling Dinamis
-    const statusColor = isFinished ? '#28a745' : (isActive ? '#007bff' : '#6c757d');
-    const statusBg = isFinished ? '#d4edda' : (isActive ? '#cce5ff' : '#e2e3e5');
+    const primaryRed = '#c91313';
+    const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#94a3b8');
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, isActive && styles.cardActive]}>
         <View style={styles.cardHeader}>
-          <Text style={styles.mapel}>{item.subject?.nama_mapel ?? 'Mata Pelajaran'}</Text>
-          <View style={[styles.badge, { backgroundColor: statusBg }]}>
-            <Text style={{ color: statusColor, fontWeight: 'bold', fontSize: 11 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapel}>{item.subject?.nama_mapel ?? 'Mapel'}</Text>
+            <Text style={[styles.examType, { color: isActive ? primaryRed : '#64748b' }]}>
+                {item.exam_type?.name ?? 'Ujian'}
+            </Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: themeColor + '15' }]}>
+            <Text style={[styles.badgeText, { color: themeColor }]}>
               {isFinished ? 'SELESAI' : item.status.toUpperCase()}
             </Text>
           </View>
         </View>
 
-        <Text style={styles.info}>Kelas: {item.classroom?.nama_kelas ?? '-'}</Text>
-        <Text style={styles.info}>
-          Guru: {item.teachers_data && item.teachers_data.length > 0 
-                  ? item.teachers_data.map((t: any) => t.name).join(', ') 
-                  : 'Tidak ada data'}
-        </Text>
-        
-        <View style={styles.divider} />
-        <Text style={styles.timeText}>📅 {item.tanggal_ujian} | ⏰ {item.jam_mulai} - {item.jam_selesai}</Text>
+        <View style={styles.footer}>
+            <View style={styles.timeGroup}>
+                <Ionicons name="timer-outline" size={16} color="#1e293b" />
+                <Text style={styles.timeText}>{item.durasi} Menit</Text>
+            </View>
+            <Text style={styles.dateText}>{item.tanggal_ujian}</Text>
+        </View>
 
-        {/* --- Tombol Aksi Dinamis --- */}
         <TouchableOpacity 
-          style={[
-            styles.btnMulai, 
-            { backgroundColor: isActive ? '#007bff' : (isFinished ? '#28a745' : '#ccc') }
-          ]}
-          onPress={() => {
-            if (isActive) {
-              // Navigasi ke Halaman Pengerjaan Ujian
-              router.push({
-                pathname: '/ujian/[id]', 
-                params: { id: item.id.toString(), token: item.token }
-              });
-            } else if (isFinished) {
-              // Navigasi ke Halaman Rekap Hasil
-              router.push({
-                pathname: '/ujian/rekap', 
-                params: { id: item.id.toString(), token: item.token }
-              });
-            }
-          }}
+          activeOpacity={0.8}
+          style={[styles.btnAction, { backgroundColor: isActive ? primaryRed : '#e2e8f0' }]}
+          onPress={() => isActive ? handleOpenTokenModal(item) : (isFinished && router.push('/ujian/rekap'))}
         >
-          <Text style={styles.btnText}>
-            {isFinished ? 'LIHAT HASIL' : (isActive ? 'MULAI UJIAN' : 'MENUNGGU')}
+          <Text style={[styles.btnText, { color: isActive ? '#fff' : '#94a3b8' }]}>
+            {isFinished ? 'LIHAT HASIL' : (isActive ? 'MASUK UJIAN' : 'BELUM AKTIF')}
           </Text>
         </TouchableOpacity>
       </View>
     );
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007bff" /></View>;
-
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.title}>Jadwal Ujian</Text>
-        <TouchableOpacity onPress={handleLogout}>
-            <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+      <StatusBar barStyle="dark-content" />
+      {/* Header Tetap Sama */}
+      <View style={styles.header}>
+        <View>
+            <Text style={styles.welcome}>Selamat Datang,</Text>
+            <Text style={styles.userName}>{user?.name ?? 'Siswa'}</Text>
+            <View style={styles.classBadge}>
+                <Text style={styles.classText}>{user?.classroom?.nama_kelas ?? '...'}</Text>
+            </View>
+        </View>
       </View>
 
       <FlatList
         data={jadwal}
-        keyExtractor={(item) => item.id.toString()}
         renderItem={renderJadwal}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>Tidak ada jadwal tersedia.</Text>}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{ padding: 20 }}
       />
+
+      {/* MODAL TOKEN SEBSTAR */}
+      <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Verifikasi Token</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubTitle}>
+              Silahkan masukkan kode token untuk mata pelajaran:{"\n"}
+              <Text style={{fontWeight: '800', color: '#1e293b'}}>{selectedExam?.subject?.nama_mapel}</Text>
+            </Text>
+
+            <TextInput
+              style={styles.tokenInput}
+              placeholder="CONTOH: AB12XY"
+              value={tokenInput}
+              onChangeText={setTokenInput}
+              autoCapitalize="characters"
+              maxLength={6}
+            />
+
+            <TouchableOpacity style={styles.modalBtn} onPress={handleVerifyToken} disabled={verifying}>
+              {verifying ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>KONFIRMASI MASUK</Text>}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-  logoutText: { color: '#dc3545', fontWeight: 'bold' },
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  mapel: { fontSize: 18, fontWeight: '800', color: '#2c3e50', flex: 1 },
-  info: { fontSize: 14, color: '#666', marginBottom: 4 },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 10 },
-  timeText: { fontSize: 13, color: '#333', fontWeight: '500' },
-  badge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginLeft: 10 },
-  btnMulai: { padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 15 },
-  btnText: { color: '#fff', fontWeight: 'bold' },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#999' }
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { paddingHorizontal: 25, paddingTop: 60, paddingBottom: 25, backgroundColor: '#fff', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 4 },
+  welcome: { fontSize: 13, color: '#64748b' },
+  userName: { fontSize: 22, fontWeight: '800', color: '#1e293b' },
+  classBadge: { alignSelf: 'flex-start', backgroundColor: '#c91313', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginTop: 5 },
+  classText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  card: { backgroundColor: '#fff', padding: 20, borderRadius: 24, marginBottom: 18, elevation: 3 },
+  cardActive: { borderLeftWidth: 6, borderLeftColor: '#c91313' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  mapel: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
+  examType: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  badgeText: { fontSize: 10, fontWeight: '800' },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timeText: { fontSize: 15, fontWeight: '800' },
+  dateText: { fontSize: 12, color: '#94a3b8' },
+  btnAction: { padding: 16, borderRadius: 15, alignItems: 'center' },
+  btnText: { fontWeight: '800', fontSize: 14 },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', backgroundColor: '#fff', borderRadius: 25, padding: 25, elevation: 10 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
+  modalSubTitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 20 },
+  tokenInput: { backgroundColor: '#f1f5f9', padding: 18, borderRadius: 15, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: 5, color: '#c91313', marginBottom: 20, borderWeight: 1, borderColor: '#e2e8f0' },
+  modalBtn: { backgroundColor: '#c91313', padding: 18, borderRadius: 15, alignItems: 'center' },
+  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 }
 });

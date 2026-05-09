@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Schedule extends Model
 {
     protected $fillable = [
-    'subject_id', 'classroom_id', 'teacher_ids', // Perhatikan 's' di belakang
-    'tanggal_ujian', 'jam_mulai', 'jam_selesai', 'durasi', 'token', 'status'
+    'subject_id', 'classroom_id', 'teacher_ids','proctor_id',// Perhatikan 's' di belakang
+    'tanggal_ujian', 'jam_mulai', 'jam_selesai', 'durasi', 'token', 'status', 'exam_type_id' // Tambahkan exam_type_id ke fillable
 ];
 
 protected $casts = [
@@ -31,5 +31,13 @@ public function studentAnswers()
 
 public function classroom() {
     return $this->belongsTo(Classroom::class);
+}
+public function proctor()
+{
+    return $this->belongsTo(User::class, 'proctor_id');
+}
+public function examType()
+{
+    return $this->belongsTo(ExamType::class, 'exam_type_id');
 }
 }

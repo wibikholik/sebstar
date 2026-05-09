@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Guru;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -9,33 +9,52 @@ use App\Models\Schedule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 
-class UjianTerpusatController extends Controller
+class QuestionController extends Controller
 {
-    public function index()
+    public function index($schedule_id)
     {
-        $teacherId = Auth::id();
+        $schedule = Schedule::with(['subject', 'classroom', 'examType'])->findOrFail($schedule_id);
+        
+        // Menampilkan semua soal yang terhubung ke jadwal ini
+        $questions = Question::where('schedule_id', $schedule_id)
+                            ->latest()
+                            ->get();
 
-        $schedules = Schedule::with(['subject', 'classroom'])
-            ->where(function($query) use ($teacherId) {
-                $query->whereJsonContains('teacher_ids', (string)$teacherId)
-                      ->orWhere('teacher_ids', $teacherId);
-            })
-            ->latest()
-            ->get();
-
-        return view('guru.ujian_terpusat.index', compact('schedules'));
+        return view('admin.questions.index', compact('schedule', 'questions'));
     }
 
-    public function manage($schedule_id)
+    public function store(Request $request, $schedule_id)
     {
-        $schedule = Schedule::with(['subject', 'classroom'])->findOrFail($schedule_id);
+        $request->validate([
+            'type'           => 'required|in:pg,essay',
+            'question_text'  => 'required',
+            'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
 
-        // Dilepas filter user_id agar guru bisa melihat soal yang diinput Admin
-        $questions = Question::where('schedule_id', $schedule_id)
-                             ->latest()
-                             ->get();
+        $schedule = Schedule::findOrFail($schedule_id);
 
-        return view('guru.ujian_terpusat.manage', compact('schedule', 'questions'));
+        $data = [
+            'subject_id'     => $schedule->subject_id,
+            'schedule_id'    => $schedule->id,
+            'user_id'        => Auth::id(),
+            'type'           => $request->type,
+            'question_text'  => $request->question_text,
+            'correct_answer' => ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay,
+        ];
+
+        if ($request->hasFile('question_image')) {
+            $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
+        }
+
+        if ($request->type == 'pg') {
+            foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
+                $data["option_$opt"] = $request->{"option_$opt"};
+            }
+        }
+
+        Question::create($data);
+
+        return redirect()->back()->with('success', 'Soal berhasil ditambahkan!');
     }
 
     public function copy(Request $request, $schedule_id)
@@ -55,55 +74,18 @@ class UjianTerpusatController extends Controller
         foreach ($sourceQuestions as $q) {
             $newQuestion = $q->replicate();
             $newQuestion->schedule_id = $targetSchedule->id;
-            $newQuestion->subject_id = $targetSchedule->subject_id;
-            $newQuestion->user_id = Auth::id(); // Pencatatnya tetap Guru yang melakukan copy
+            $newQuestion->user_id = Auth::id();
             $newQuestion->save();
         }
 
         return redirect()->back()->with('success', count($sourceQuestions) . ' soal berhasil disalin!');
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'subject_id'     => 'required',
-            'schedule_id'    => 'required',
-            'type'           => 'required|in:pg,essay',
-            'question_text'  => 'required',
-            'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        $data = [
-            'subject_id'     => $request->subject_id,
-            'schedule_id'    => $request->schedule_id,
-            'user_id'        => Auth::id(),
-            'type'           => $request->type,
-            'question_text'  => $request->question_text,
-            'correct_answer' => ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay,
-        ];
-
-        if ($request->hasFile('question_image')) {
-            $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
-        }
-
-        if ($request->type == 'pg') {
-            foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
-                $data["option_$opt"] = $request->{"option_$opt"};
-            }
-        }
-
-        Question::create($data);
-
-        return redirect()->route('guru.ujian-terpusat.manage', $request->schedule_id)
-                         ->with('success', 'Soal berhasil ditambahkan!');
-    }
-
-    public function update(Request $request, $id)
+    public function update(Request $request, $schedule_id, $id)
     {
         $question = Question::findOrFail($id);
 
         $request->validate([
-            'schedule_id'    => 'required',
             'type'           => 'required|in:pg,essay',
             'question_text'  => 'required',
             'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
@@ -134,18 +116,15 @@ class UjianTerpusatController extends Controller
 
         $question->update($data);
 
-        return redirect()->route('guru.ujian-terpusat.manage', $request->schedule_id)
-                         ->with('success', 'Soal berhasil diperbarui!');
+        return redirect()->back()->with('success', 'Soal berhasil diperbarui!');
     }
 
-    public function destroy($id)
+    public function destroy($schedule_id, $id)
     {
         $question = Question::findOrFail($id);
-
         if ($question->question_image) {
             Storage::disk('public')->delete($question->question_image);
         }
-
         $question->delete();
 
         return redirect()->back()->with('success', 'Soal berhasil dihapus!');
