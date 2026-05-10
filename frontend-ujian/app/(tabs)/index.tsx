@@ -1,5 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, StatusBar, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { 
+  View, Text, FlatList, TouchableOpacity, StyleSheet, 
+  ActivityIndicator, Alert, RefreshControl, StatusBar, 
+  Modal, TextInput, KeyboardAvoidingView, Platform 
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import api from '../../src/api/axiosConfig'; 
@@ -32,12 +36,18 @@ export default function DashboardScreen() {
         await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
       }
     } catch (error: any) {
+      console.error("Fetch Error:", error);
       const localUser = await AsyncStorage.getItem('userData');
       if (localUser) setUser(JSON.parse(localUser));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
   };
 
   const handleOpenTokenModal = (exam: any) => {
@@ -96,10 +106,20 @@ export default function DashboardScreen() {
 
         <TouchableOpacity 
           activeOpacity={0.8}
-          style={[styles.btnAction, { backgroundColor: isActive ? primaryRed : '#e2e8f0' }]}
-          onPress={() => isActive ? handleOpenTokenModal(item) : (isFinished && router.push('/ujian/rekap'))}
+          style={[styles.btnAction, { backgroundColor: isFinished ? '#1e293b' : (isActive ? primaryRed : '#e2e8f0') }]}
+          onPress={() => {
+            if (isActive) {
+              handleOpenTokenModal(item);
+            } else if (isFinished) {
+              // PERBAIKAN: Kirim parameter id dan token agar halaman rekap tidak error
+              router.push({
+                pathname: '/ujian/rekap',
+                params: { id: item.id, token: item.token }
+              });
+            }
+          }}
         >
-          <Text style={[styles.btnText, { color: isActive ? '#fff' : '#94a3b8' }]}>
+          <Text style={[styles.btnText, { color: (isActive || isFinished) ? '#fff' : '#94a3b8' }]}>
             {isFinished ? 'LIHAT HASIL' : (isActive ? 'MASUK UJIAN' : 'BELUM AKTIF')}
           </Text>
         </TouchableOpacity>
@@ -107,10 +127,14 @@ export default function DashboardScreen() {
     );
   };
 
+  if (loading) return (
+    <View style={styles.center}><ActivityIndicator size="large" color="#c91313" /></View>
+  );
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      {/* Header Tetap Sama */}
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
       <View style={styles.header}>
         <View>
             <Text style={styles.welcome}>Selamat Datang,</Text>
@@ -126,6 +150,9 @@ export default function DashboardScreen() {
         renderItem={renderJadwal}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ padding: 20 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#c91313" />
+        }
       />
 
       {/* MODAL TOKEN SEBSTAR */}
@@ -146,7 +173,7 @@ export default function DashboardScreen() {
 
             <TextInput
               style={styles.tokenInput}
-              placeholder="CONTOH: AB12XY"
+              placeholder="TOKEN"
               value={tokenInput}
               onChangeText={setTokenInput}
               autoCapitalize="characters"
@@ -165,6 +192,7 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { paddingHorizontal: 25, paddingTop: 60, paddingBottom: 25, backgroundColor: '#fff', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 4 },
   welcome: { fontSize: 13, color: '#64748b' },
   userName: { fontSize: 22, fontWeight: '800', color: '#1e293b' },
@@ -183,7 +211,6 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12, color: '#94a3b8' },
   btnAction: { padding: 16, borderRadius: 15, alignItems: 'center' },
   btnText: { fontWeight: '800', fontSize: 14 },
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', backgroundColor: '#fff', borderRadius: 25, padding: 25, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

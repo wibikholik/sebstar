@@ -11,9 +11,6 @@ use Illuminate\Support\Facades\Auth;
 
 class ExamController extends Controller
 {
-    /**
-     * Verifikasi Token Ujian
-     */
     public function verifyToken(Request $request, $id)
     {
         $request->validate(['token' => 'required']);
@@ -30,9 +27,6 @@ class ExamController extends Controller
         return response()->json(['message' => 'Token valid'], 200);
     }
 
-    /**
-     * Ambil Soal Ujian (PENTING: 'type' sudah dimasukkan di select)
-     */
     public function getSoal(Request $request, $id)
     {
         $token = $request->header('X-Exam-Token');
@@ -42,7 +36,6 @@ class ExamController extends Controller
             return response()->json(['message' => 'Akses ditolak'], 403);
         }
 
-        // PERBAIKAN: Menambahkan 'type' ke select agar frontend tahu ini soal PG atau Essay
         $questions = Question::where('subject_id', $schedule->subject_id)
             ->select('id', 'type', 'question_text', 'question_image', 'option_a', 'option_b', 'option_c', 'option_d', 'option_e')
             ->get();
@@ -54,12 +47,8 @@ class ExamController extends Controller
         return response()->json($questions, 200);
     }
 
-    /**
-     * Simpan Jawaban (PG & Essay)
-     */
     public function submitAnswer(Request $request, $id)
     {
-        // Validasi input
         $request->validate([
             'question_id' => 'required|integer',
             'answer' => 'required|string',
@@ -72,10 +61,9 @@ class ExamController extends Controller
             return response()->json(['message' => 'Sesi ujian tidak valid'], 403);
         }
 
-        // Simpan ke database
         StudentAnswer::updateOrCreate(
             [
-                'user_id' => Auth::id(), // Pastikan siswa login
+                'user_id' => Auth::id(),
                 'schedule_id' => $id,
                 'question_id' => $request->question_id,
             ],
@@ -85,128 +73,146 @@ class ExamController extends Controller
         return response()->json(['message' => 'Jawaban tersimpan'], 200);
     }
 
-    /**
-     * Mengakhiri Ujian
-     */
     public function finishExam(Request $request, $id)
-{
-    $token = $request->header('X-Exam-Token');
-    $schedule = Schedule::find($id);
+    {
+        $token = $request->header('X-Exam-Token');
+        $schedule = Schedule::find($id);
 
-    if (!$schedule || $schedule->token !== $token) {
-        return response()->json(['message' => 'Token tidak valid'], 403);
+        if (!$schedule || $schedule->token !== $token) {
+            return response()->json(['message' => 'Token tidak valid'], 403);
+        }
+
+        StudentAnswer::where('user_id', Auth::id())
+                     ->where('schedule_id', $id)
+                     ->update(['is_finished' => true]);
+
+        return response()->json(['message' => 'Ujian berhasil dikirim'], 200);
     }
 
-    // Update semua jawaban user ini untuk schedule ini menjadi selesai
-    StudentAnswer::where('user_id', Auth::id())
-                 ->where('schedule_id', $id)
-                 ->update(['is_finished' => true]);
-
-    return response()->json(['message' => 'Ujian berhasil dikirim'], 200);
-}
     /**
-     * Mengambil Hasil Ujian
+     * 1. Menampilkan Hasil Ujian dengan Bobot Dinamis
      */
-   public function getResult(Request $request, $id)
-{
-    $token = $request->header('X-Exam-Token');
-    $schedule = Schedule::find($id);
+    public function getResult(Request $request, $id)
+    {
+        $token = $request->header('X-Exam-Token');
+        $schedule = Schedule::with('subject')->find($id);
 
-    if (!$schedule || $schedule->token !== $token) {
-        return response()->json(['message' => 'Akses ditolak'], 403);
-    }
-
-    $questions = Question::where('subject_id', $schedule->subject_id)->get();
-    $userAnswers = StudentAnswer::where('schedule_id', $id)
-                                ->where('user_id', Auth::id())
-                                ->get();
-
-    $pgCorrect = 0;
-    $pgWrong = 0;
-    $essayAnswered = 0;
-    
-    // Hitung total untuk label
-    $totalPg = $questions->where('type', 'pg')->count();
-    $totalEssay = $questions->where('type', 'essay')->count();
-
-    foreach ($questions as $question) {
-        $answer = $userAnswers->where('question_id', $question->id)->first();
-
-        if ($question->type === 'pg') {
-            if ($answer && strtolower($answer->answer) === strtolower($question->correct_answer)) {
-                $pgCorrect++;
-            } else {
-                $pgWrong++;
-            }
-        } elseif ($question->type === 'essay') {
-            if ($answer && !empty($answer->answer)) {
-                $essayAnswered++;
-            }
+        if (!$schedule || $schedule->token !== $token) {
+            return response()->json(['message' => 'Akses ditolak'], 403);
         }
-    }
 
-    $score = ($totalPg > 0) ? ($pgCorrect / $totalPg) * 100 : 0;
+        $userAnswers = StudentAnswer::with('question')
+                                    ->where('schedule_id', $id)
+                                    ->where('user_id', Auth::id())
+                                    ->get();
 
-    return response()->json([
-        'score' => round($score, 2),
-        'pg' => [
-            'correct' => $pgCorrect,
-            'wrong' => $pgWrong,
-            'total' => $totalPg
-        ],
-        'essay' => [
-            'answered' => $essayAnswered,
-            'total' => $totalEssay
-        ]
-    ], 200);
-}
-/**
- * Mengambil Riwayat Nilai
- */
-/**
- * Mengambil Riwayat Nilai
- */
-public function getHistory(Request $request)
-{
-    $userId = Auth::id();
+        // Pisahkan jawaban PG dan Essay
+        $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
+        $essayAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'essay');
 
-    // 1. Ambil jadwal yang sudah dikerjakan (is_finished = true)
-    $history = Schedule::whereHas('studentAnswers', function ($query) use ($userId) {
-        $query->where('user_id', $userId)
-              ->where('is_finished', true);
-    })
-    ->with(['subject', 'studentAnswers' => function($query) use ($userId) {
-        $query->where('user_id', $userId);
-    }])
-    ->latest()
-    ->get()
-    ->map(function ($schedule) {
-        // 2. Hitung ulang score PG agar bisa ditampilkan di history
-        $questions = \App\Models\Question::where('subject_id', $schedule->subject_id)->get();
-        $userAnswers = $schedule->studentAnswers;
-
+        // Hitung PG (Skala 100)
+        $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
         $pgCorrect = 0;
-        $totalPg = $questions->where('type', 'pg')->count();
-
-        foreach ($questions->where('type', 'pg') as $question) {
-            $ans = $userAnswers->where('question_id', $question->id)->first();
-            if ($ans && strtolower($ans->answer) === strtolower($question->correct_answer)) {
+        foreach ($pgAnswers as $ans) {
+            if (strtolower(trim($ans->answer)) === strtolower(trim($ans->question->correct_answer))) {
                 $pgCorrect++;
             }
         }
+        $scorePgRaw = ($pgCorrect / $totalPg) * 100;
 
-        $score = ($totalPg > 0) ? ($pgCorrect / $totalPg) * 100 : 0;
+        // Hitung Essay (Skala 100) - Diambil dari kolom 'score' yang diisi guru
+        $scoreEssayRaw = $essayAnswers->sum('score');
 
-        // 3. Kembalikan data yang sudah diformat untuk frontend
-        return [
-            'id' => $schedule->id,
-            'token' => $schedule->token,
-            'nama_mapel' => $schedule->subject->nama_mapel ?? 'N/A',
-            'tanggal_ujian' => $schedule->tanggal_ujian,
-            'score' => round($score, 2)
-        ];
-    });
+        // Ambil Bobot dari Database
+        $wPg = ($schedule->weight_pg ?? 60) / 100;
+        $wEssay = ($schedule->weight_essay ?? 40) / 100;
 
-    return response()->json($history, 200);
-}
+        // Kalkulasi Final
+        $finalScore = ($scorePgRaw * $wPg) + ($scoreEssayRaw * $wEssay);
+        
+        // Cek apakah guru sudah selesai menilai essay
+        $isGradedAll = $essayAnswers->isEmpty() ? true : !$essayAnswers->where('is_graded', false)->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'subject_name' => $schedule->subject->nama_mapel ?? 'N/A',
+                'tanggal_ujian' => \Carbon\Carbon::parse($schedule->tanggal_ujian)->translatedFormat('d F Y'),
+                'final_score' => $isGradedAll ? round($finalScore, 2) : 0,
+                'is_complete' => $isGradedAll,
+                'breakdown' => [
+                    'score_pg' => round($scorePgRaw, 2),
+                    'score_essay' => round($scoreEssayRaw, 2),
+                    'weight_pg' => ($wPg * 100) . '%',
+                    'weight_essay' => ($wEssay * 100) . '%'
+                ],
+                'pg' => [
+                    'correct' => $pgCorrect,
+                    'wrong' => $totalPg - $pgCorrect,
+                    'total' => $totalPg
+                ],
+                'essay' => [
+                    'answered' => $essayAnswers->count(),
+                    'total' => Question::where('subject_id', $schedule->subject_id)->where('type', 'essay')->count()
+                ],
+                'details' => $userAnswers->map(fn($item) => [
+                    'question' => $item->question->question_text,
+                    'score' => $item->score,
+                    'teacher_note' => $item->teacher_note
+                ])
+            ]
+        ], 200);
+    }
+
+    /**
+     * 2. Riwayat Ujian dengan Perhitungan Bobot
+     */
+    public function getHistory(Request $request)
+    {
+        $userId = Auth::id();
+
+        $history = Schedule::whereHas('studentAnswers', function ($query) use ($userId) {
+            $query->where('user_id', $userId)
+                  ->where('is_finished', true);
+        })
+        ->with(['subject'])
+        ->latest()
+        ->get()
+        ->map(function ($schedule) use ($userId) {
+            $userAnswers = StudentAnswer::with('question')
+                                        ->where('schedule_id', $schedule->id)
+                                        ->where('user_id', $userId)
+                                        ->get();
+
+            // Hitung skor akhir sesuai bobot untuk history
+            $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
+            $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
+            
+            $pgCorrect = 0;
+            foreach ($pgAnswers as $ans) {
+                if (strtolower(trim($ans->answer)) === strtolower(trim($ans->question->correct_answer))) {
+                    $pgCorrect++;
+                }
+            }
+            $scorePgRaw = ($pgCorrect / $totalPg) * 100;
+
+            $essayAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'essay');
+            $scoreEssayRaw = $essayAnswers->sum('score');
+
+            $wPg = ($schedule->weight_pg ?? 60) / 100;
+            $wEssay = ($schedule->weight_essay ?? 40) / 100;
+            
+            $finalScore = ($scorePgRaw * $wPg) + ($scoreEssayRaw * $wEssay);
+
+            return [
+                'id'            => $schedule->id,
+                'token'         => $schedule->token,
+                'nama_mapel'    => $schedule->subject->nama_mapel ?? 'N/A',
+                'tanggal_ujian' => \Carbon\Carbon::parse($schedule->tanggal_ujian)->translatedFormat('d M Y'),
+                'score'         => round($finalScore, 2)
+            ];
+        });
+
+        return response()->json($history, 200);
+    }
 }

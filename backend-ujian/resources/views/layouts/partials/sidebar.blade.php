@@ -20,6 +20,9 @@
             <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                 Kelola Pengguna
             </a>
+                <a href="{{ route('admin.exam-types.index') }}" class="nav-link {{ request()->routeIs('admin.exam-types.*') ? 'active' : '' }}">
+            Tipe Ujian
+        </a>
             <a href="{{ route('admin.schedules.index') }}" class="nav-link {{ request()->routeIs('admin.schedules.*') ? 'active' : '' }}">
                 Jadwal Ujian
             </a>
@@ -34,12 +37,14 @@
         {{-- MENU KHUSUS GURU --}}
         @if(auth()->user()->role == 'guru')
             <div class="menu-label" style="font-size: 10px; color: #94a3b8; padding: 10px 20px 5px; font-weight: 800;">INSTRUKSIONAL</div>
-            <a href="{{ route('guru.ujian-terpusat.index') }}" class="nav-link {{ request()->routeIs('guru.ujian-terpusat.*') ? 'active' : '' }}">
-                Ujian Terpusat
-            </a>
-            <a href="#" class="nav-link">Bank Soal Mandiri</a>
-            <a href="#" class="nav-link">Koreksi & Nilai</a>
             
+            <a href="{{ route('guru.schedules.index') }}" class="nav-link {{ request()->routeIs('guru.schedules.*') ? 'active' : '' }}">
+                Jadwal Ujian & Bank Soal
+            </a>
+            <a href="{{ route('guru.koreksi.list') }}" class="nav-link {{ request()->routeIs('guru.koreksi.*') ? 'active' : '' }}">
+                Koreksi & Nilai
+            </a>
+
             {{-- Menu Monitoring untuk Guru --}}
             <div class="menu-label" style="font-size: 10px; color: #cd0000; padding: 10px 20px 5px; font-weight: 800;">PENGAWASAN</div>
             <a href="{{ route('guru.monitoring.index') }}" class="nav-link {{ request()->routeIs('guru.monitoring.*') ? 'active' : '' }}" style="border-left: 3px solid #cd0000;">
