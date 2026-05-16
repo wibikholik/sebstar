@@ -48,8 +48,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
     Route::resource('classrooms', ClassroomController::class)->names('admin.classrooms');
     Route::resource('majors', MajorController::class)->names('admin.majors');
     
-    // MODUL TYPE UJIAN (REVISI DI SINI)
-    // Menggunakan .names agar terbaca admin.exam-types.index
+    // MODUL TYPE UJIAN
     Route::resource('exam-types', ExamTypeController::class)
         ->names('admin.exam-types')
         ->except(['show', 'create', 'edit']);
@@ -82,14 +81,14 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
     Route::delete('/schedules/{id}', [App\Http\Controllers\Guru\ScheduleController::class, 'destroy'])->name('schedules.destroy');
 
     // 3. Modul Manajemen Soal (Questions)
-    // Menggunakan QuestionController yang sudah kita refactor
     Route::resource('questions', \App\Http\Controllers\Guru\QuestionController::class)->names('questions');
     Route::get('/questions/manage/{schedule_id}', [\App\Http\Controllers\Guru\QuestionController::class, 'manage'])->name('questions.manage');
     Route::post('/questions/copy/{schedule_id}', [\App\Http\Controllers\Guru\QuestionController::class, 'copy'])->name('questions.copy');
 
-    // 4. Modul Monitoring
+    // 4. Modul Monitoring (DITAMBAHKAN ROUTE RESET SISWA)
     Route::get('/monitoring', [GuruMonitor::class, 'index'])->name('monitoring.index');
     Route::get('/monitoring/{id}', [GuruMonitor::class, 'show'])->name('monitoring.show');
+    Route::post('/monitoring/{schedule_id}/reset/{student_id}', [GuruMonitor::class, 'resetStudent'])->name('monitoring.reset');
 
     // 5. Modul Koreksi Nilai
     Route::get('/koreksi', [KoreksiController::class, 'listSchedules'])->name('koreksi.list');
@@ -105,6 +104,9 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
 // --- GROUP PENGAWAS MURNI ---
 Route::prefix('pengawas')->middleware(['auth', 'role:pengawas'])->name('pengawas.')->group(function () {
     Route::get('/dashboard', [PengawasDash::class, 'index'])->name('dashboard');
+    
+    // Modul Monitoring (DITAMBAHKAN ROUTE RESET SISWA)
     Route::get('/monitoring', [PengawasMonitor::class, 'index'])->name('monitoring.index');
     Route::get('/monitoring/{id}', [PengawasMonitor::class, 'show'])->name('monitoring.show');
+    Route::post('/monitoring/{schedule_id}/reset/{student_id}', [PengawasMonitor::class, 'resetStudent'])->name('monitoring.reset');
 });

@@ -12,7 +12,6 @@ use App\Http\Controllers\Api\ScheduleController;
 */
 
 // --- 1. RUTE PUBLIK ---
-// Pastikan rute ini bisa diakses tanpa proteksi apapun
 Route::post('/login', [AuthController::class, 'login']);
 
 // --- 2. RUTE TERLINDUNGI (Wajib Token Sanctum) ---
@@ -21,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/force-logout', [AuthController::class, 'logout']);
     
     // Jadwal
     Route::get('/jadwal', [ScheduleController::class, 'index']);
@@ -31,12 +31,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ujian/{id}/submit-answer', [ExamController::class, 'submitAnswer']);
     
     // Finish Exam
-    Route::post('/ujian/{id}/finish', [ExamController::class, 'finishExam']); 
+    Route::post('/ujian/{id}/finish', [ExamController::class, 'finishExam']);
     
     // History Ujian
     Route::get('/ujian/history', [ExamController::class, 'getHistory']);
     
     // Hasil Ujian
     Route::get('/ujian/{id}/hasil', [ExamController::class, 'getResult']);
+    Route::post('/ujian/{id}/log-pelanggaran', [ExamController::class, 'logPelanggaran']);
     
 });

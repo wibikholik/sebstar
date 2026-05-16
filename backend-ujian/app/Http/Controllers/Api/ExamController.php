@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Question;
 use App\Models\Schedule;
 use App\Models\StudentAnswer;
+use App\Models\ExamLog; // <-- Model baru untuk mencatat log kecurangan pengawasan
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class ExamController extends Controller
 {
@@ -214,5 +216,43 @@ class ExamController extends Controller
         });
 
         return response()->json($history, 200);
+    }
+
+    /**
+     * 3. MODUL PENGAWASAN: Menyimpan log kecurangan siswa secara realtime dari HP mobile
+     */
+    public function logPelanggaran(Request $request, $id)
+    {
+        $request->validate([
+            'type' => 'required|string',
+            'details' => 'nullable|string'
+        ]);
+
+        try {
+            // Mengambil ID siswa yang sedang melakukan ujian berdasarkan token middleware auth:sanctum
+            $userId = Auth::id(); 
+
+            // Simpan data record kecurangan ke tabel database exam_logs
+            $log = ExamLog::create([
+                'schedule_id' => $id, // Diambil langsung dari URL parameter ID jadwal ujian aktif
+                'user_id' => $userId,
+                'type' => $request->type, // Contoh data masuk: 'keluar_aplikasi' atau 'screenshot'
+                'details' => $request->details ?? 'Siswa terdeteksi memindahkan fokus layar ujian browser ketat.',
+                'created_at' => Carbon::now('Asia/Jakarta') // Waktu presisi lokal server Asia/Jakarta
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Log pelanggaran sukses dikirim ke dashboard live monitoring pengawas.',
+                'data' => $log
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengirimkan log pengawasan ke database server.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

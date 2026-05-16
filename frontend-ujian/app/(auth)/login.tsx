@@ -8,12 +8,13 @@ import {
   Alert, 
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform 
+  Platform,
+  StatusBar
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
-// Keluar 2 tingkat: dari (auth) -> app -> root, lalu masuk ke src
+// Konfigurasi API Axios kamu
 import api from '../../src/api/axiosConfig'; 
 
 export default function LoginScreen() {
@@ -23,7 +24,6 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    // 1. Validasi input sederhana
     if (!nis || !password) {
       Alert.alert('Peringatan', 'NIS dan Password harus diisi');
       return;
@@ -32,33 +32,38 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // 2. Request ke endpoint login di Laravel backend
       const response = await api.post('/login', {
         nis: nis,
         password: password,
       });
 
-      // Simpan token ke storage
       const token = response.data.access_token;
       await AsyncStorage.setItem('userToken', token);
 
       console.log("Login Berhasil!");
-      
-      // 3. Arahkan ke halaman utama (tabs)
       router.replace('/(tabs)'); 
 
     } catch (error: any) {
-      setLoading(false);
-      
+      console.log("Login Error Log:", error.response?.status, error.response?.data);
+
       if (error.response) {
-        // Error dari server (misal: 401 Unauthorized)
-        Alert.alert('Login Gagal', error.response.data.message || 'NIS atau Password salah');
+        const statusCode = error.response.status;
+        const serverMessage = error.response.data.message;
+
+        if (statusCode === 403) {
+          Alert.alert(
+            'Akses Ditolak', 
+            serverMessage || 'Akun Anda terdeteksi sedang aktif di perangkat lain. Silahkan logout terlebih dahulu atau hubungi proktor.'
+          );
+        } else if (statusCode === 401) {
+          Alert.alert('Login Gagal', serverMessage || 'NIS atau Password salah');
+        } else {
+          Alert.alert('Gagal', serverMessage || `Terjadi kesalahan pada server (Error: ${statusCode})`);
+        }
       } else if (error.request) {
-        // Tidak ada respon dari server
-        Alert.alert('Gagal', 'Server tidak merespons. Pastikan IP di axiosConfig sudah benar.');
+        Alert.alert('Gagal Jaringan', 'Server tidak merespons. Pastikan IP di axiosConfig sudah benar dan PC Server menyala.');
       } else {
-        // Error lainnya
-        Alert.alert('Error', 'Terjadi kesalahan sistem');
+        Alert.alert('Error', 'Terjadi kesalahan sistem internal.');
       }
     } finally {
       setLoading(false);
@@ -70,28 +75,52 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      
+      {/* Ornamen Estetik Latar Belakang */}
+      <View style={[styles.circleDecor, { top: -100, right: -100, backgroundColor: '#dbeafe' }]} />
+      <View style={[styles.circleDecor, { bottom: -150, left: -100, backgroundColor: '#eff6ff' }]} />
+
+      <View style={styles.headerSection}>
+        <Text style={styles.brandTitle}>SEB<Text style={styles.brandAccent}>STAR</Text></Text>
+        <Text style={styles.brandSubtitle}>Computer Assisted Test Platform</Text>
+      </View>
+
       <View style={styles.formContainer}>
-        <Text style={styles.title}>SEBSTAR</Text>
-        <Text style={styles.subtitle}>Selamat Datang di Aplikasi Ujian</Text>
+        <Text style={styles.loginHeader}>Silahkan Masuk</Text>
+        <Text style={styles.loginSubheader}>Gunakan nomor induk siswa resmi dari sekolah</Text>
 
-        <TextInput 
-          style={styles.input} 
-          placeholder="Masukkan NIS" 
-          value={nis} 
-          onChangeText={setNis}
-          keyboardType="numeric"
-          autoCapitalize="none"
-        />
+        {/* Input NIS */}
+        <Text style={styles.inputLabel}>Nomor Induk Siswa (NIS)</Text>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.inputIcon}>👤</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Contoh: 212210234" 
+            placeholderTextColor="#94a3b8"
+            value={nis} 
+            onChangeText={setNis}
+            keyboardType="numeric"
+            autoCapitalize="none"
+          />
+        </View>
         
-        <TextInput 
-          style={styles.input} 
-          placeholder="Masukkan Password" 
-          value={password} 
-          onChangeText={setPassword}
-          secureTextEntry 
-          autoCapitalize="none"
-        />
+        {/* Input Password */}
+        <Text style={styles.inputLabel}>Kata Sandi</Text>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.inputIcon}>🔒</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Masukkan kata sandi Anda" 
+            placeholderTextColor="#94a3b8"
+            value={password} 
+            onChangeText={setPassword}
+            secureTextEntry 
+            autoCapitalize="none"
+          />
+        </View>
 
+        {/* Tombol Masuk */}
         <TouchableOpacity 
           style={[styles.button, loading && styles.buttonDisabled]} 
           onPress={handleLogin}
@@ -100,11 +129,14 @@ export default function LoginScreen() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>MASUK</Text>
+            <Text style={styles.buttonText}>MASUK KE UJIAN</Text>
           )}
         </TouchableOpacity>
-        
-        <Text style={styles.footerText}>Ver. 1.0 - SMKN 1 Binong</Text>
+      </View>
+
+      <View style={styles.footerContainer}>
+        <Text style={styles.footerText}>Secure Exam Browser Node</Text>
+        <Text style={styles.schoolText}>SMKN 1 BINONG</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -114,61 +146,130 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     justifyContent: 'center', 
-    backgroundColor: '#f5f5f5' 
+    backgroundColor: '#f8fafc', // Warna dasar putih abu slate yang bersih
+    paddingHorizontal: 20
+  },
+  circleDecor: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.6,
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 35
+  },
+  brandTitle: { 
+    fontSize: 40, 
+    fontWeight: '900', 
+    color: '#1e293b',
+    letterSpacing: 3,
+  },
+  brandAccent: {
+    color: '#2563eb' // Warna biru aksen cerah
+  },
+  brandSubtitle: { 
+    fontSize: 13, 
+    color: '#64748b',
+    marginTop: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: '600'
   },
   formContainer: {
-    padding: 25,
-    margin: 20,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    padding: 28,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    elevation: 8,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    borderWidth: 1,
+    borderColor: '#f1f5f9'
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: 'bold', 
-    textAlign: 'center', 
-    color: '#1a73e8',
-    letterSpacing: 2
+  loginHeader: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a'
   },
-  subtitle: { 
-    fontSize: 14, 
-    textAlign: 'center', 
-    marginBottom: 30, 
-    color: '#666',
-    marginTop: 5
+  loginSubheader: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+    marginBottom: 24,
+    lineHeight: 18
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    backgroundColor: '#f8fafc',
+    marginBottom: 18,
+    paddingHorizontal: 14,
+  },
+  inputIcon: {
+    fontSize: 16,
+    marginRight: 10,
+    color: '#64748b'
   },
   input: { 
-    borderWidth: 1, 
-    borderColor: '#e0e0e0', 
-    padding: 15, 
-    marginBottom: 15, 
-    borderRadius: 12,
-    backgroundColor: '#fafafa',
-    fontSize: 16
+    flex: 1,
+    paddingVertical: 14, 
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '500'
   },
   button: { 
-    backgroundColor: '#1a73e8', 
+    backgroundColor: '#2563eb', 
     padding: 16, 
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 10
+    marginTop: 10,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3
   },
   buttonDisabled: { 
-    backgroundColor: '#a0c4ff' 
+    backgroundColor: '#93c5fd',
+    shadowOpacity: 0
   },
   buttonText: { 
     color: '#fff', 
-    fontSize: 18, 
-    fontWeight: 'bold' 
+    fontSize: 15, 
+    fontWeight: '700', 
+    letterSpacing: 1
+  },
+  footerContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    alignItems: 'center'
   },
   footerText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#999',
-    fontSize: 12
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '500'
+  },
+  schoolText: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: 1
   }
 });

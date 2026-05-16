@@ -21,10 +21,12 @@ class User extends Authenticatable
         'nip',        // Untuk Guru
         'subject_id',  // Relasi ke Mapel (Guru)
         'classroom_id', // Relasi ke Kelas (Siswa) - Tambahkan ini
+        'is_logged_in', // Status login untuk proteksi double login
     ];
 
     protected $hidden = [
         'password',
+        
         'remember_token',
     ];
 
@@ -54,5 +56,14 @@ class User extends Authenticatable
     public function answers()
 {
     return $this->hasMany(StudentAnswer::class, 'user_id');
+}
+public function studentAnswers()
+{
+    return $this->hasMany(StudentAnswer::class, 'user_id');
+
+}
+public function examLogs()
+{
+    return $this->hasMany(ExamLog::class, 'user_id');
 }
 }
