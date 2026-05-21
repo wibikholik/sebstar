@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Monitoring Ujian (Guru)')
+@section('title', 'Monitoring Ujian')
 
 <style>
     /* Background Premium dengan Efek Polkadot Grid Modern */

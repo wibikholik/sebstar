@@ -224,11 +224,6 @@
 </style>
 
 @section('content')
-    <!-- Header Dashboard -->
-    <div style="margin-bottom: 25px;">
-        <h1 style="font-size: 24px; font-weight: 700; color: #1e1e2f; margin: 0;">Dashboard Utama</h1>
-        <p style="font-size: 14px; color: #6a6a7a; margin: 5px 0 0 0;">Ringkasan data SMKN 1 Binong hari ini.</p>
-    </div>
 
     <!-- Statistik Utama Grid -->
     <div class="stats-grid">
