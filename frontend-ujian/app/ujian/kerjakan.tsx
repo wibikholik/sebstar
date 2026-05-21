@@ -18,17 +18,19 @@ import {
   AppState, 
   BackHandler 
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'; // Modifikasi: Import useNavigation untuk deteksi blur fokus
 import api from '../../src/api/axiosConfig';
 import { Ionicons } from '@expo/vector-icons';
 import * as ScreenCapture from 'expo-screen-capture';
 import { Audio } from 'expo-av';
+import Pusher from 'pusher-js';
 
 const { width } = Dimensions.get('window');
 
 export default function KerjakanScreen() {
   const { id, token } = useLocalSearchParams();
   const router = useRouter();
+  const navigation = useNavigation(); // Mengaktifkan pengontrol fokus navigasi layar
   
   // STATE SOAL & JAWABAN
   const [soal, setSoal] = useState([]);
@@ -37,21 +39,31 @@ export default function KerjakanScreen() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [studentId, setStudentId] = useState(null);
   
   // STATE KEAMANAN & TIMER
   const [timeLeft, setTimeLeft] = useState(0);
   const soundRef = useRef(null); 
   const appState = useRef(AppState.currentState);
   const timerRef = useRef(null);
+  const pusherRef = useRef(null);
+  const violationTriggered = useRef(false); // Flag pengunci agar request pelanggaran tidak menembak berkali-kali (anti-spam data)
 
   // ANIMASI SIDE NAV
   const [sideNavVisible, setSideNavVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-width)).current;
 
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+  const REVERB_KEY = process.env.EXPO_PUBLIC_REVERB_KEY;
   const primaryRed = '#c91313';
 
-  // --- 1. FUNGSI ALARM PERINGATAN KELUAR (INSTAN) ---
+  const getWsHost = () => {
+    if (!BASE_URL) return 'localhost';
+    const matches = BASE_URL.match(/\/\/([^:]+)/);
+    return matches ? matches[1] : 'localhost';
+  };
+
+  // --- 1. FUNGSI ALARM PERINGATAN KELUAR APPLICATION ---
   async function playWarningSound() {
     try {
       if (soundRef.current) {
@@ -67,7 +79,102 @@ export default function KerjakanScreen() {
     }
   }
 
-  // --- 2. LOGIKA MONITORING KEAMANAN ---
+  async function stopWarningSound() {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      } catch (e) {
+        console.log("Gagal mematikan suara alarm:", e);
+      }
+    }
+  }
+
+  // --- 2. LOGIKA UTAMA EKSEKUSI HUKUMAN DISKUALIFIKASI ---
+  const eksekusiDiskualifikasi = async (alasan) => {
+    // Jika flag pengaman sudah true, hentikan proses biar tidak tabrakan
+    if (violationTriggered.current || isSubmitted) return;
+    violationTriggered.current = true;
+
+    console.log(`🛑 Tindakan Kecurangan Terditeksi: ${alasan}`);
+    
+    // Mainkan sirine alarm lokal kencang-kencang
+    playWarningSound();
+
+    // Kirim bukti kecurangan ke server pengawas secara live
+    try {
+      await api.post(`/ujian/${id}/log-pelanggaran`, { 
+        type: 'KELUAR_APLIKASI',
+        details: `Siswa melanggar mode ketat: ${alasan}`
+      });
+      console.log("Log pelanggaran sukses dilaporkan ke database.");
+    } catch (e) { 
+      console.log("Gagal kirim log pelanggaran ke backend:", e.message); 
+    }
+
+    // Tendang keluar paksa ke login
+    router.replace('/(auth)/login');
+
+    if (Platform.OS === 'web') {
+      window.alert(`DISKUALIFIKASI: ${alasan}`);
+    } else {
+      Alert.alert("🛑 DISKUALIFIKASI SISTEM", `Anda otomatis dikeluarkan dari ruang ujian karena terdeteksi: ${alasan}`);
+    }
+  };
+
+  // --- 3. LOGIKA MONITORING REAL-TIME (WEBSOCKET REVERB) ---
+  useEffect(() => {
+    if (!id || !studentId || !REVERB_KEY) return;
+
+    pusherRef.current = new Pusher(REVERB_KEY, {
+      wsHost: getWsHost(),
+      wsPort: 8080,
+      forceTLS: false,
+      disableStats: true,
+      enabledTransports: ['ws', 'wss']
+    });
+
+    const channel = pusherRef.current.subscribe(`exam-monitoring.${id}`);
+    
+    channel.bind('ExamAktivitas', async (data) => {
+      console.log("Sinyal Real-time masuk ke HP Siswa:", data);
+
+      if (parseInt(data.studentId) === parseInt(studentId)) {
+        if (data.actionType === 'RESET_AKSES') {
+          await stopWarningSound();
+          violationTriggered.current = false; // Buka kembali kunci flag pelanggaran
+          if (timerRef.current) clearInterval(timerRef.current);
+          
+          Alert.alert(
+            "Akses Dipulihkan", 
+            "Guru pengawas telah mereset status login Anda.",
+            [{ text: "Kembali ke Beranda", onPress: () => router.replace('/(tabs)') }]
+          );
+        } 
+        else if (data.actionType === 'FORCE_SUBMIT') {
+          await stopWarningSound();
+          if (timerRef.current) clearInterval(timerRef.current);
+          setIsSubmitted(true);
+          
+          Alert.alert(
+            "Ujian Selesai Paksa", 
+            "Pengerjaan lembar ujian Anda telah diselesaikan dan dikunci oleh pengawas ruangan.",
+            [{ text: "Lihat Rekap Ujian", onPress: () => router.replace({ pathname: '/ujian/selesai', params: { id, token } }) }]
+          );
+        }
+      }
+    });
+
+    return () => {
+      if (pusherRef.current) {
+        pusherRef.current.unsubscribe(`exam-monitoring.${id}`);
+        pusherRef.current.disconnect();
+      }
+    };
+  }, [id, studentId]);
+
+  // --- 4. ENGINE KEAMANAN BARU (LAPIS BAJA MULTI-DETEKSI) ---
   useEffect(() => {
     fetchData();
 
@@ -75,37 +182,26 @@ export default function KerjakanScreen() {
       ScreenCapture.preventScreenCaptureAsync().catch(() => {});
     }
 
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+    // 🛡️ LAPIS 1: Deteksi via Siklus Hidup OS (AppState)
+    const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+      // Menangkap status 'background' (klik Home) atau status 'inactive' (tarik status bar / buka menu split view)
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
-        console.log("Kecurangan Terdeteksi: Siswa meninggalkan aplikasi ujian!");
-        
-        playWarningSound();
-        
-        try {
-          await api.post(`/ujian/${id}/log-pelanggaran`, { 
-            type: 'keluar_aplikasi',
-            details: 'Siswa terdeteksi memindahkan fokus layar / menekan tombol home perangkat.'
-          });
-          console.log("Data pelanggaran sukses terkirim ke web pengawas.");
-        } catch (e) { 
-          console.log("Gagal kirim log pelanggaran:", e.message); 
-        }
-
-        router.replace('/(auth)/login');
-        
-        if (Platform.OS === 'web') {
-          window.alert("DISKUALIFIKASI: Anda keluar dari fokus layar aplikasi ujian.");
-        } else {
-          Alert.alert("DISKUALIFIKASI", "Anda dikeluarkan dari ruang ujian karena terdeteksi keluar dari aplikasi.");
-        }
+        eksekusiDiskualifikasi("Membuka laci notifikasi atas, menekan Recent Apps, atau mencoba membelah layar (Split Screen).");
       }
       appState.current = nextAppState;
     });
 
+    // 🛡️ LAPIS 2: Deteksi via Hilangnya Fokus Navigasi (Anti-Split Screen Jari Menyentuh Aplikasi Sebelah)
+    const blurSubscription = navigation.addListener('blur', () => {
+      eksekusiDiskualifikasi("Kehilangan fokus layar pengerjaan utama (mencoba interaksi dengan aplikasi melayang/jendela disamping).");
+    });
+
+    // Mengunci tombol hardware back bawaan HP Android
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
 
     return () => {
-      subscription.remove();
+      appStateSubscription.remove();
+      blurSubscription();
       backHandler.remove();
       if (timerRef.current) clearInterval(timerRef.current);
       if (Platform.OS !== 'web') {
@@ -117,12 +213,14 @@ export default function KerjakanScreen() {
     };
   }, [id]);
 
-  // --- 3. AMBIL DATA SOAL & PROTEKSI VALIDASI TOKEN ---
+  // --- 5. HTTP REQUEST AMBIL DATA SOAL & USER PROFILE ---
   const fetchData = async () => {
     try {
-      // Ambil lembar soal dengan menyertakan token di headers
       const resSoal = await api.get(`/ujian/${id}/soal`, { headers: { 'X-Exam-Token': token } });
       setSoal(resSoal.data);
+      
+      const resUser = await api.get('/user'); 
+      setStudentId(resUser.data.id);
       
       const resJadwal = await api.get('/jadwal');
       const currentJadwal = resJadwal.data.data.find((j) => j.id.toString() === id.toString());
@@ -132,18 +230,12 @@ export default function KerjakanScreen() {
         startTimer(durasiDetik);
       }
     } catch (e) { 
-      // JIKA INTERCEPTOR ATAU SERVER MERESPON ERROR (MISAL: TOKEN SALAH / EXPIRIED)
       const errorMsg = e.response?.data?.message || "Token ujian salah atau sesi pengerjaan Anda tidak valid.";
-      
       if (Platform.OS === 'web') {
         window.alert("AKSES DITOLAK: " + errorMsg);
-        router.replace('/(tabs)'); // Tendang balik ke beranda jadwal (sesuaikan path tab kamu)
+        router.replace('/(tabs)'); 
       } else {
-        Alert.alert(
-          "Akses Ditolak", 
-          errorMsg,
-          [{ text: "Kembali", onPress: () => router.replace('/(tabs)') }]
-        );
+        Alert.alert("Akses Ditolak", errorMsg, [{ text: "Kembali", onPress: () => router.replace('/(tabs)') }]);
       }
     } finally { 
       setLoading(false); 
@@ -174,7 +266,7 @@ export default function KerjakanScreen() {
   };
 
   const handleAnswerChange = async (questionId, answer) => {
-    if (isSubmitted) return;
+    if (isSubmitted || violationTriggered.current) return;
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: answer }));
     try {
       await api.post(`/ujian/${id}/submit-answer`, { 
@@ -218,7 +310,8 @@ export default function KerjakanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={primaryRed} />
+      {/* 🛡️ LAPIS 3: Agresif menyembunyikan status bar agar area penarikan notifikasi terkunci/hilang */}
+      <StatusBar hidden={true} />
       
       {/* HEADER BAR */}
       <View style={styles.header}>
@@ -361,7 +454,7 @@ export default function KerjakanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: '#c91313', height: 75, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: Platform.OS === 'android' ? 25 : 0 },
+  header: { backgroundColor: '#c91313', height: 75, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: Platform.OS === 'android' ? 10 : 0 },
   menuIcon: { width: 35 },
   schoolHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   logoSekolah: { width: 35, height: 35, borderRadius: 5, backgroundColor: '#fff' },

@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Question;
 use App\Models\Schedule;
 use App\Models\StudentAnswer;
-use App\Models\ExamLog; // <-- Model baru untuk mencatat log kecurangan pengawasan
+use App\Models\ExamLog; 
+use App\Events\ExamMonitoringEvent; // 📢 Import Event Reverb agar log mobile tersiar ke Web Guru
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -22,6 +23,17 @@ class ExamController extends Controller
             return response()->json(['message' => 'Ujian tidak ditemukan'], 404);
         }
 
+        // 🛑 TAMBAHAN: Cegah login jika siswa berstatus Diskualifikasi atau di-Force Submit
+        $userId = Auth::id();
+        $isLocked = ExamLog::where('schedule_id', $id)
+            ->where('user_id', $userId)
+            ->whereIn('type', ['KELUAR_APLIKASI', 'keluar_aplikasi', 'FORCE_SUBMIT'])
+            ->exists();
+
+        if ($isLocked) {
+            return response()->json(['message' => 'Akses ditolak! Sesi pengerjaan Anda telah dikunci oleh sistem.'], 403);
+        }
+
         if ($schedule->token !== $request->token) {
             return response()->json(['message' => 'Token ujian salah'], 403);
         }
@@ -33,9 +45,22 @@ class ExamController extends Controller
     {
         $token = $request->header('X-Exam-Token');
         $schedule = Schedule::find($id);
+        $userId = Auth::id();
 
         if (!$schedule || $schedule->token !== $token) {
             return response()->json(['message' => 'Akses ditolak'], 403);
+        }
+
+        // 🛑 PERBAIKAN UTAMA: Blokir total pengambilan soal jika siswa sedang didiskualifikasi / force submit
+        $isLocked = ExamLog::where('schedule_id', $id)
+            ->where('user_id', $userId)
+            ->whereIn('type', ['KELUAR_APLIKASI', 'keluar_aplikasi', 'FORCE_SUBMIT'])
+            ->exists();
+
+        if ($isLocked) {
+            return response()->json([
+                'message' => 'Akses ditolak! Lembar pengerjaan ujian Anda sudah dikunci akibat pelanggaran fokus layar atau penghentian paksa oleh pengawas.'
+            ], 403); 
         }
 
         $questions = Question::where('subject_id', $schedule->subject_id)
@@ -58,14 +83,25 @@ class ExamController extends Controller
 
         $token = $request->header('X-Exam-Token');
         $schedule = Schedule::find($id);
+        $userId = Auth::id();
 
         if (!$schedule || $schedule->token !== $token) {
             return response()->json(['message' => 'Sesi ujian tidak valid'], 403);
         }
 
+        // 🛑 TAMBAHAN: Blokir auto-save jawaban jika statusnya sudah dikunci (mencegah manipulasi paksa dari HP)
+        $isLocked = ExamLog::where('schedule_id', $id)
+            ->where('user_id', $userId)
+            ->whereIn('type', ['KELUAR_APLIKASI', 'keluar_aplikasi', 'FORCE_SUBMIT'])
+            ->exists();
+
+        if ($isLocked) {
+            return response()->json(['message' => 'Gagal menyimpan. Status ujian Anda telah dibekukan.'], 403);
+        }
+
         StudentAnswer::updateOrCreate(
             [
-                'user_id' => Auth::id(),
+                'user_id' => $userId,
                 'schedule_id' => $id,
                 'question_id' => $request->question_id,
             ],
@@ -91,9 +127,6 @@ class ExamController extends Controller
         return response()->json(['message' => 'Ujian berhasil dikirim'], 200);
     }
 
-    /**
-     * 1. Menampilkan Hasil Ujian dengan Bobot Dinamis
-     */
     public function getResult(Request $request, $id)
     {
         $token = $request->header('X-Exam-Token');
@@ -108,11 +141,9 @@ class ExamController extends Controller
                                     ->where('user_id', Auth::id())
                                     ->get();
 
-        // Pisahkan jawaban PG dan Essay
         $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
         $essayAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'essay');
 
-        // Hitung PG (Skala 100)
         $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
         $pgCorrect = 0;
         foreach ($pgAnswers as $ans) {
@@ -121,18 +152,12 @@ class ExamController extends Controller
             }
         }
         $scorePgRaw = ($pgCorrect / $totalPg) * 100;
-
-        // Hitung Essay (Skala 100) - Diambil dari kolom 'score' yang diisi guru
         $scoreEssayRaw = $essayAnswers->sum('score');
 
-        // Ambil Bobot dari Database
         $wPg = ($schedule->weight_pg ?? 60) / 100;
         $wEssay = ($schedule->weight_essay ?? 40) / 100;
 
-        // Kalkulasi Final
         $finalScore = ($scorePgRaw * $wPg) + ($scoreEssayRaw * $wEssay);
-        
-        // Cek apakah guru sudah selesai menilai essay
         $isGradedAll = $essayAnswers->isEmpty() ? true : !$essayAnswers->where('is_graded', false)->count();
 
         return response()->json([
@@ -166,9 +191,6 @@ class ExamController extends Controller
         ], 200);
     }
 
-    /**
-     * 2. Riwayat Ujian dengan Perhitungan Bobot
-     */
     public function getHistory(Request $request)
     {
         $userId = Auth::id();
@@ -186,7 +208,6 @@ class ExamController extends Controller
                                         ->where('user_id', $userId)
                                         ->get();
 
-            // Hitung skor akhir sesuai bobot untuk history
             $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
             $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
             
@@ -219,7 +240,7 @@ class ExamController extends Controller
     }
 
     /**
-     * 3. MODUL PENGAWASAN: Menyimpan log kecurangan siswa secara realtime dari HP mobile
+     * 3. PERBAIKAN MODUL PENGAWASAN: Menyimpan log kecurangan SEKALIGUS melakukan real-time broadcast ke Web Guru
      */
     public function logPelanggaran(Request $request, $id)
     {
@@ -229,21 +250,23 @@ class ExamController extends Controller
         ]);
 
         try {
-            // Mengambil ID siswa yang sedang melakukan ujian berdasarkan token middleware auth:sanctum
             $userId = Auth::id(); 
 
-            // Simpan data record kecurangan ke tabel database exam_logs
+            // Simpan record kecurangan siswa ke database
             $log = ExamLog::create([
-                'schedule_id' => $id, // Diambil langsung dari URL parameter ID jadwal ujian aktif
+                'schedule_id' => $id, 
                 'user_id' => $userId,
-                'type' => $request->type, // Contoh data masuk: 'keluar_aplikasi' atau 'screenshot'
+                'type' => strtoupper($request->type), // Mengubah string menjadi huruf kapital murni ('KELUAR_APLIKASI')
                 'details' => $request->details ?? 'Siswa terdeteksi memindahkan fokus layar ujian browser ketat.',
-                'created_at' => Carbon::now('Asia/Jakarta') // Waktu presisi lokal server Asia/Jakarta
+                'created_at' => Carbon::now('Asia/Jakarta')
             ]);
+
+            // 📢 PERBAIKAN REAL-TIME: Siarkan kejadian curang ini lewat Reverb agar web guru langsung berkedip merah otomatis!
+            broadcast(new ExamMonitoringEvent($id, $userId, 'PELANGGARAN', "Siswa terdeteksi melakukan tindakan: {$request->type}."))->toOthers();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Log pelanggaran sukses dikirim ke dashboard live monitoring pengawas.',
+                'message' => 'Log pelanggaran sukses dikirim dan disiarkan secara real-time ke web pengawas.',
                 'data' => $log
             ], 200);
 
