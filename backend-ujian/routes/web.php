@@ -89,6 +89,8 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
     Route::get('/monitoring', [GuruMonitor::class, 'index'])->name('monitoring.index');
     Route::get('/monitoring/{id}', [GuruMonitor::class, 'show'])->name('monitoring.show');
     Route::post('/monitoring/{schedule_id}/reset/{student_id}', [GuruMonitor::class, 'resetStudent'])->name('monitoring.reset');
+    Route::patch('/monitoring/{schedule}/update-status', [GuruMonitor::class, 'updateStatus'])->name('monitoring.updateStatus');
+    Route::post('/monitoring/{schedule}/student/{student}/force-submit', [GuruMonitor::class, 'forceSubmit'])->name('monitoring.forceSubmit');
 
     // 5. Modul Koreksi Nilai
     Route::get('/koreksi', [KoreksiController::class, 'listSchedules'])->name('koreksi.list');
