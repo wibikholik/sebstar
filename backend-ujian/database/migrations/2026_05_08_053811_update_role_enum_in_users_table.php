@@ -9,14 +9,22 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
-{
-    // Gunakan DB statement karena perubahan ENUM terkadang sulit lewat Blueprint biasa
-    DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'guru', 'siswa', 'pengawas') NOT NULL");
-}
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            // Mengubah kolom role menjadi string secara aman yang didukung SQLite & MySQL
+            $table->string('role')->default('siswa')->change();
+        });
+    }
 
-public function down()
-{
-    DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'guru', 'siswa') NOT NULL");
-}
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            // Kembalikan ke default jika di-rollback
+            $table->string('role')->default('siswa')->change();
+        });
+    }
 };

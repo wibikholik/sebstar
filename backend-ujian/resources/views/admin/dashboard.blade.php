@@ -2,59 +2,321 @@
 
 @section('title', 'Dashboard Admin')
 
-@section('content')
-    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
-        <div class="stat-card">
-            <h2 style="font-size: 28px;">{{ $jml_siswa }}</h2>
-            <p>TOTAL SISWA</p>
-        </div>
-        <div class="stat-card">
-            <h2 style="font-size: 28px;">{{ $jml_guru }}</h2>
-            <p>TOTAL GURU</p>
-        </div>
-        <div class="stat-card">
-            <h2 style="font-size: 28px;">{{ $jml_pengawas }}</h2>
-            <p>TOTAL PENGAWAS</p>
-        </div>
-        <div class="stat-card">
-            <h2 style="font-size: 28px;">{{ $jml_schedule }}</h2> <p>TOTAL JADWAL UJIAN</p>
-        </div>
-    </div>
+<style>
+    /* Background dengan Gradasi Merah-Putih Tegas + Efek Polkadot Grid Modern */
+    body {
+        background-color: #f4f5f9 !important;
+        background-image: 
+            radial-gradient(rgba(230, 57, 70, 0.15) 1.5px, transparent 1.5px), 
+            linear-gradient(135deg, #fceade 0%, #f4f5f9 50%, #ffffff 100%) !important;
+        background-size: 24px 24px, 100% 100% !important;
+        background-attachment: fixed !important;
+    }
 
-    <div class="content-box" style="margin-bottom: 25px;">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">Statistik Sistem</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-            <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
-                <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Total Mata Pelajaran</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px;">{{ $jml_mata_pelajaran }}</h2>
+    /* ================= MAIN CONTENT LAYOUT ================= */
+    .stats-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 22px !important;
+        margin-bottom: 30px !important;
+    }
+
+    /* Desain Card Statistik Utama (Kontras Tinggi) */
+    .stat-card {
+        background: #ffffff !important;
+        padding: 24px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 18px !important;
+        border: 2px solid #ffffff !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 15px 30px rgba(230, 57, 70, 0.15) !important;
+        border-color: rgba(230, 57, 70, 0.3) !important;
+    }
+
+    /* Wrapper Icon Utama dengan Efek Glow Khas */
+    .stat-icon-wrapper {
+        width: 58px !important;
+        height: 58px !important;
+        border-radius: 14px !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        font-size: 24px !important;
+        transition: all 0.4s ease !important;
+    }
+
+    /* Pewarnaan Icon Spesifik yang Kontras & Atraktif */
+    .icon-siswa { background: rgba(30, 144, 255, 0.1) !important; color: #1e90ff !important; }
+    .icon-guru { background: rgba(46, 204, 113, 0.1) !important; color: #2ecc71 !important; }
+    .icon-pengawas { background: rgba(241, 196, 15, 0.1) !important; color: #f1c40f !important; }
+    .icon-jadwal { background: rgba(230, 57, 70, 0.1) !important; color: #cd0000 !important; }
+
+    /* Hover State: Icon Berubah Penuh & Efek Putar Halus */
+    .stat-card:hover .icon-siswa { background: #1e90ff !important; color: #ffffff !important; transform: scale(1.1) rotate(5deg) !important; }
+    .stat-card:hover .icon-guru { background: #2ecc71 !important; color: #ffffff !important; transform: scale(1.1) rotate(-5deg) !important; }
+    .stat-card:hover .icon-pengawas { background: #f1c40f !important; color: #ffffff !important; transform: scale(1.1) rotate(5deg) !important; }
+    .stat-card:hover .icon-jadwal { background: #cd0000 !important; color: #ffffff !important; transform: scale(1.1) rotate(-5deg) !important; }
+
+    .stat-info h2 {
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #1e1e2f !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+    }
+
+    .stat-info p {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #6a6a7a !important;
+        letter-spacing: 1px !important;
+        margin: 4px 0 0 0 !important;
+    }
+
+    /* Pembungkus Konten Box Putih */
+    .content-box {
+        background: #ffffff !important;
+        border-radius: 16px !important;
+        padding: 25px !important;
+        margin-bottom: 30px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .box-header h3 {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #1e1e2f !important;
+        margin-bottom: 22px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+
+    .header-icon {
+        color: #cd0000 !important;
+    }
+
+    /* Grid Sistem Informasi Mini */
+    .mini-stats-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 20px !important;
+    }
+
+    .mini-card {
+        padding: 20px !important;
+        border: 1px solid #edf0f5 !important;
+        border-radius: 12px !important;
+        background: #fafafa !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .mini-card-info p {
+        color: #6a6a7a !important;
+        font-size: 13px !important;
+        margin: 0 0 6px 0 !important;
+        font-weight: 600 !important;
+    }
+
+    .mini-card-info h2 {
+        font-size: 32px !important;
+        font-weight: 700 !important;
+        color: #1e1e2f !important;
+        margin: 0 !important;
+    }
+
+    /* Icon Khusus Mini Card Fitur */
+    .mini-card-icon {
+        font-size: 26px !important;
+        color: #a0a0b0 !important;
+        transition: all 0.3s ease !important;
+    }
+
+    /* Highlight Merah Khusus Ujian Hari Ini */
+    .mini-card.highlight {
+        border-left: 4px solid #cd0000 !important;
+        background: rgba(230, 57, 70, 0.02) !important;
+    }
+
+    .mini-card.highlight .mini-card-icon {
+        color: rgba(205, 0, 0, 0.4) !important;
+    }
+
+    .mini-card:hover {
+        box-shadow: 0 8px 20px rgba(0,0,0,0.04) !important;
+        border-color: #cd0000 !important;
+        background: #ffffff !important;
+    }
+
+    .mini-card:hover .mini-card-icon {
+        color: #cd0000 !important;
+        transform: scale(1.1) !important;
+    }
+
+    /* ================= CHARTS SECTION LAYOUT ================= */
+    .charts-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 25px !important;
+    }
+
+    .chart-container-box {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        background: #fdfdfd !important;
+        border: 1px solid #edf0f5 !important;
+        padding: 20px !important;
+        border-radius: 14px !important;
+    }
+
+    .chart-wrapper {
+        position: relative !important;
+        width: 100% !important;
+        height: 260px !important; 
+        margin-bottom: 20px !important;
+    }
+
+    /* ================= BUTTON ACTION MODERATION ================= */
+    .btn-action-premium {
+        background: linear-gradient(135deg, #cd0000 0%, #950000 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 12px 28px !important;
+        border-radius: 30px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        box-shadow: 0 5px 15px rgba(205, 0, 0, 0.25) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .btn-action-premium:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 22px rgba(205, 0, 0, 0.4) !important;
+        filter: brightness(1.1) !important;
+    }
+
+    .btn-action-premium i {
+        font-size: 14px !important;
+        transition: transform 0.3s ease !important;
+    }
+
+    .btn-action-premium:hover i {
+        transform: rotate(90deg) !important;
+    }
+</style>
+
+@section('content')
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_siswa }}</h2>
+                <p>TOTAL SISWA</p>
             </div>
-            <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
-                <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Total Kelas</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px;">{{ $jml_kelas }}</h2>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-guru"><i class="fas fa-chalkboard-teacher"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_guru }}</h2>
+                <p>TOTAL GURU</p>
             </div>
-            <div style="padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fafafa;">
-                <p style="color: var(--text-gray); font-size: 13px; margin: 0;">Ujian Hari Ini</p>
-                <h2 style="margin: 5px 0 0; font-size: 32px; color: var(--red-sebstar);">{{ $jml_ujian_hari_ini }}</h2>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-pengawas"><i class="fas fa-user-lock"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_pengawas }}</h2>
+                <p>TOTAL PENGAWAS</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-jadwal"><i class="fas fa-calendar-check"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_schedule }}</h2>
+                <p>TOTAL JADWAL UJIAN</p>
             </div>
         </div>
     </div>
 
     <div class="content-box">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">Grafik Statistik</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+        <div class="box-header">
+            <h3><i class="fas fa-chart-pie header-icon"></i> Statistik Sistem</h3>
+        </div>
+        <div class="mini-stats-grid">
+            <div class="mini-card">
+                <div class="mini-card-info">
+                    <p>Total Mata Pelajaran</p>
+                    <h2>{{ $jml_mata_pelajaran }}</h2>
+                </div>
+                <i class="fas fa-book-open mini-card-icon"></i>
+            </div>
             
-            <div style="text-align: center;">
-                <div style="height: 200px; background: #f8f9fa; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;">
+            <div class="mini-card">
+                <div class="mini-card-info">
+                    <p>Total Kelas</p>
+                    <h2>{{ $jml_kelas }}</h2>
+                </div>
+                <i class="fas fa-school mini-card-icon"></i>
+            </div>
+            
+            <div class="mini-card highlight">
+                <div class="mini-card-info">
+                    <p>Ujian Hari Ini</p>
+                    <h2>{{ $jml_ujian_hari_ini }}</h2>
+                </div>
+                <i class="fas fa-laptop-code mini-card-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-box">
+        <div class="box-header">
+            <h3><i class="fas fa-chart-line header-icon"></i> Grafik Monitoring Aktivitas</h3>
+        </div>
+        <div class="charts-grid">
+            
+            <div class="chart-container-box">
+                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
+                    <i class="fas fa-graduation-cap" style="color: #cd0000; margin-right: 5px;"></i> Distribusi Data Siswa (Sampel Jurusan)
+                </h4>
+                <div class="chart-wrapper">
                     <canvas id="chartSiswa"></canvas>
                 </div>
-                <button class="btn-add" style="margin: 0 auto; font-size: 13px;">+ Buat Soal Baru</button>
+                <button class="btn-action-premium">
+                    <i class="fas fa-folder-plus"></i> Kelola Data Soal
+                </button>
             </div>
 
-            <div style="text-align: center;">
-                <div style="height: 200px; background: #f8f9fa; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;">
+            <div class="chart-container-box">
+                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
+                    <i class="fas fa-history" style="color: #cd0000; margin-right: 5px;"></i> Aktivitas Sesi Ujian Seminggu Terakhir
+                </h4>
+                <div class="chart-wrapper">
                     <canvas id="chartKeaktifan"></canvas>
                 </div>
-                <button class="btn-add" style="margin: 0 auto; font-size: 13px;">+ Buat Ujian Baru</button>
+                <button class="btn-action-premium">
+                    <i class="fas fa-sliders-h"></i> Atur Sesi Ujian
+                </button>
             </div>
 
         </div>
@@ -63,24 +325,58 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Chart 1
+            Chart.defaults.maintainAspectRatio = false;
+
+            // Chart 1: Bar Chart Data Siswa per Jurusan
             new Chart(document.getElementById('chartSiswa'), {
                 type: 'bar',
                 data: {
-                    labels: ['Jan', 'Feb', 'Mar'],
-                    datasets: [{ label: 'Soal', data: [{{ $jml_schedule }}], backgroundColor: '#cd0000', borderRadius: 5 }]
+                    labels: ['RPL', 'TKJ', 'AKL', 'TKR'],
+                    datasets: [{ 
+                        label: 'Jumlah Siswa', 
+                        data: [{{ $jml_siswa }}, 120, 95, 140], 
+                        backgroundColor: '#cd0000',
+                        borderRadius: 6,
+                        barThickness: 30
+                    }]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: { 
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#eef0f4' } },
+                        x: { grid: { display: false } }
+                    }
+                }
             });
 
-            // Chart 2
+            // Chart 2: Line Chart Sesi Ujian Mingguan
             new Chart(document.getElementById('chartKeaktifan'), {
                 type: 'line',
                 data: {
                     labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum'],
-                    datasets: [{ label: 'Ujian', data: [2, 5, 3, 8, 4], borderColor: '#cd0000', tension: 0.4 }]
+                    datasets: [{ 
+                        label: 'Sesi Selesai', 
+                        data: [12, 25, 18, {{ $jml_ujian_hari_ini * 5 ?: 30 }}, 15], 
+                        borderColor: '#cd0000', 
+                        borderWidth: 3,
+                        backgroundColor: 'rgba(205, 0, 0, 0.05)',
+                        fill: true,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#cd0000',
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.3 
+                    }]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: { 
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#eef0f4' } },
+                        x: { grid: { display: false } }
+                    }
+                }
             });
         });
     </script>
