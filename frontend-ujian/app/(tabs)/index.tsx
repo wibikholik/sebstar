@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +6,6 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ActivityIndicator, 
-  Alert, 
   RefreshControl, 
   StatusBar, 
   Modal, 
@@ -25,12 +24,23 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
+  // STATE MODAL TOKEN INPUT
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedExam, setSelectedExam] = useState(null);
   const [tokenInput, setTokenInput] = useState('');
   const [verifying, setVerifying] = useState(false);
 
+  // STATE BARU: UNTUK CUSTOM ALERT MODAL (SOLUSI GAIRAH WEB & MOBILE)
+  const [customAlert, setCustomAlert] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info', // 'info' atau 'konfirmasi'
+    onConfirm: null
+  });
+
   const router = useRouter();
+  const primaryRed = '#c91313';
 
   useEffect(() => {
     fetchData();
@@ -64,19 +74,16 @@ export default function DashboardScreen() {
   const executeLogout = async () => {
     setLoading(true);
     try {
-      // Tembak server backend Laravel untuk reset status device is_logged_in = 0
       await api.post('/logout'); 
       console.log("Server merespon sukses logout.");
     } catch (e) {
-      console.log("Bypass API: Server tidak merespon atau offline, langsung paksa logout lokal.");
+      console.log("Bypass API Logout.");
     } finally {
       try {
-        // Hapus token session di HP agar bersih total
         await AsyncStorage.removeItem('userToken');
         await AsyncStorage.removeItem('userData');
         setModalVisible(false);
-        
-        // Kembalikan siswa ke screen login
+        setCustomAlert(prev => ({ ...prev, visible: false }));
         router.replace('/(auth)/login');
       } catch (err) {
         console.log("Gagal membersihkan storage lokal");
@@ -86,23 +93,24 @@ export default function DashboardScreen() {
     }
   };
 
-  // --- FUNGSI TRIGGER ALERTS YANG COMPATIBLE UNTUK WEB & APK ANDROID ---
-  const handleLogoutPress = () => {
-    console.log("Tombol Keluar Ditekan!");
+  // --- TRIGGER ALERT SYSTEM MULTI-PLATFORM ---
+  const bukaAlertKustom = (title, message, type = 'info', onConfirmCallback = null) => {
+    setCustomAlert({
+      visible: true,
+      title: title,
+      message: message,
+      type: type,
+      onConfirm: onConfirmCallback
+    });
+  };
 
-    if (Platform.OS === 'web') {
-      // Jalankan konfirmasi window browser jika diuji coba di Chrome laptop
-      const confirmWeb = window.confirm("Apakah Anda yakin ingin keluar dari aplikasi?");
-      if (confirmWeb) {
-        executeLogout();
-      }
-    } else {
-      // Jalankan Alert Native UI jika dijalankan dalam bentuk APK HP Android
-      Alert.alert("Konfirmasi", "Apakah Anda yakin ingin keluar?", [
-        { text: "Batal", style: "cancel" },
-        { text: "Keluar", style: "destructive", onPress: executeLogout }
-      ]);
-    }
+  const handleLogoutPress = () => {
+    bukaAlertKustom(
+      "Konfirmasi Keluar", 
+      "Apakah Anda yakin ingin keluar dari akun ujian Anda?", 
+      "konfirmasi", 
+      executeLogout
+    );
   };
 
   const formatTanggal = (dateString) => {
@@ -131,7 +139,11 @@ export default function DashboardScreen() {
   };
 
   const handleVerifyToken = async () => {
-    if (!tokenInput) return Alert.alert('Error', 'Masukkan token ujian!');
+    if (!tokenInput) {
+      bukaAlertKustom("Validasi Gagal", "Silahkan masukkan kode token ujian terlebih dahulu!", "info");
+      return;
+    }
+    
     setVerifying(true);
     try {
       await api.post(`/ujian/${selectedExam.id}/verify-token`, { token: tokenInput });
@@ -141,7 +153,8 @@ export default function DashboardScreen() {
         params: { id: selectedExam.id, token: tokenInput }
       });
     } catch (e) {
-      Alert.alert('Gagal', e.response?.data?.message || 'Token tidak valid');
+      const msg = e.response?.data?.message || 'Kode token yang Anda masukkan tidak valid.';
+      bukaAlertKustom("Verifikasi Gagal", msg, "info");
     } finally {
       setVerifying(false);
     }
@@ -150,7 +163,6 @@ export default function DashboardScreen() {
   const renderJadwal = ({ item }) => {
     const isFinished = item.is_finished;
     const isActive = item.status === 'aktif' && !isFinished;
-    const primaryRed = '#c91313';
     const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#94a3b8');
 
     return (
@@ -206,7 +218,7 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
-      {/* HEADER CONTAINER FIXED TOP */}
+      {/* HEADER CONTAINER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
             <Text style={styles.welcome}>Selamat Datang,</Text>
@@ -216,17 +228,12 @@ export default function DashboardScreen() {
             </View>
         </View>
         
-        {/* Tombol Logout Terisolasi Sempurna */}
-        <TouchableOpacity 
-          onPress={handleLogoutPress} 
-          style={styles.logoutBtn} 
-          activeOpacity={0.4}
-        >
+        <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutBtn} activeOpacity={0.4}>
             <Ionicons name="log-out-outline" size={26} color="#c91313" />
         </TouchableOpacity>
       </View>
 
-      {/* BODY CONTENT CONTAINER */}
+      {/* BODY CONTENT */}
       <View style={styles.body}>
         {loading && !refreshing ? (
           <View style={styles.center}>
@@ -245,37 +252,89 @@ export default function DashboardScreen() {
         )}
       </View>
 
-      {/* MODAL TOKEN */}
-      <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Verifikasi Token</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#64748b" />
+      {/* MODAL TOKEN INPUT (RELIABLE FOR WEB) */}
+      {modalVisible && (
+        <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Verifikasi Token</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.modalSubTitle}>
+                Silahkan masukkan kode token untuk mata pelajaran:{"\n"}
+                <Text style={{fontWeight: '800', color: '#1e293b'}}>{selectedExam?.subject?.nama_mapel}</Text>
+              </Text>
+
+              <TextInput
+                style={styles.tokenInput}
+                placeholder="TOKEN"
+                value={tokenInput}
+                onChangeText={setTokenInput}
+                autoCapitalize="characters"
+                maxLength={6}
+              />
+
+              <TouchableOpacity style={styles.modalBtn} onPress={handleVerifyToken} disabled={verifying}>
+                {verifying ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnText}>KONFIRMASI MASUK</Text>
+                )}
               </TouchableOpacity>
             </View>
-            
-            <Text style={styles.modalSubTitle}>
-              Silahkan masukkan kode token untuk mata pelajaran:{"\n"}
-              <Text style={{fontWeight: '800', color: '#1e293b'}}>{selectedExam?.subject?.nama_mapel}</Text>
-            </Text>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
 
-            <TextInput
-              style={styles.tokenInput}
-              placeholder="TOKEN"
-              value={tokenInput}
-              onChangeText={setTokenInput}
-              autoCapitalize="characters"
-              maxLength={6}
-            />
-
-            <TouchableOpacity style={styles.modalBtn} onPress={handleVerifyToken}>
-              <Text style={styles.modalBtnText}>KONFIRMASI MASUK</Text>
-            </TouchableOpacity>
+      {/* ========================================== */}
+      {/* 🛡️ KUSTOM MODAL ALERT (SOLUSI UTAMA WEB)   */}
+      {/* ========================================== */}
+      {customAlert.visible && (
+        <Modal animationType="fade" transparent={true} visible={customAlert.visible}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.customAlertCard}>
+              <Ionicons 
+                name={customAlert.type === 'konfirmasi' ? "help-circle-outline" : "alert-circle-outline"} 
+                size={50} 
+                color={primaryRed} 
+                style={{ marginBottom: 10 }} 
+              />
+              <Text style={styles.customAlertTitle}>{customAlert.title}</Text>
+              <Text style={styles.customAlertMessage}>{customAlert.message}</Text>
+              
+              <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+                {customAlert.type === 'konfirmasi' && (
+                  <TouchableOpacity 
+                    style={styles.alertCancelBtn} 
+                    onPress={() => setCustomAlert(prev => ({ ...prev, visible: false }))}
+                  >
+                    <Text style={styles.alertCancelText}>Batal</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={[styles.alertConfirmBtn, { backgroundColor: primaryRed }]} 
+                  onPress={() => {
+                    if (customAlert.type === 'konfirmasi' && customAlert.onConfirm) {
+                      customAlert.onConfirm();
+                    } else {
+                      setCustomAlert(prev => ({ ...prev, visible: false }));
+                    }
+                  }}
+                >
+                  <Text style={styles.alertConfirmText}>
+                    {customAlert.type === 'konfirmasi' ? 'Ya, Keluar' : 'OK'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </Modal>
+      )}
+
     </View>
   );
 }
@@ -289,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between', 
     paddingHorizontal: 25, 
-    paddingTop: 60, 
+    paddingTop: Platform.OS === 'web' ? 25 : 60, 
     paddingBottom: 25, 
     backgroundColor: '#fff', 
     borderBottomLeftRadius: 30, 
@@ -301,17 +360,8 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     zIndex: 999, 
   },
-  headerLeft: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  logoutBtn: {
-    padding: 12,
-    backgroundColor: '#fee2e2',
-    borderRadius: 12,
-    marginLeft: 15,
-    elevation: 2,
-  },
+  headerLeft: { flex: 1, alignItems: 'flex-start' },
+  logoutBtn: { padding: 12, backgroundColor: '#fee2e2', borderRadius: 12, marginLeft: 15, elevation: 2 },
   welcome: { fontSize: 13, color: '#64748b' },
   userName: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
   classBadge: { alignSelf: 'flex-start', backgroundColor: '#c91313', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginTop: 5 },
@@ -329,12 +379,23 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12, color: '#64748b', fontWeight: '600' },
   btnAction: { padding: 16, borderRadius: 15, alignItems: 'center' },
   btnText: { fontWeight: '800', fontSize: 14 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', backgroundColor: '#fff', borderRadius: 25, padding: 25, elevation: 10 },
+  
+  // MODAL OVERLAYS
+  modalOverlay: { position: Platform.OS === 'web' ? 'fixed' : 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
+  modalContent: { width: Platform.OS === 'web' ? '400px' : '90%', backgroundColor: '#fff', borderRadius: 25, padding: 25, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
   modalSubTitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 20 },
   tokenInput: { backgroundColor: '#f1f5f9', padding: 18, borderRadius: 15, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: 5, color: '#c91313', marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
   modalBtn: { backgroundColor: '#c91313', padding: 18, borderRadius: 15, alignItems: 'center' },
-  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 }
+  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+
+  // STYLES CUSTOM ALERT MODAL
+  customAlertCard: { width: Platform.OS === 'web' ? '360px' : '85%', backgroundColor: '#fff', padding: 25, borderRadius: 24, alignItems: 'center', elevation: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 },
+  customAlertTitle: { fontSize: 18, fontWeight: '900', color: '#1e293b', marginBottom: 10, textAlign: 'center' },
+  customAlertMessage: { fontSize: 14, color: '#475569', fontWeight: '500', marginBottom: 20, textAlign: 'center', lineHeight: 20 },
+  alertConfirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  alertConfirmText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  alertCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#f1f5f9' },
+  alertCancelText: { color: '#64748b', fontWeight: '800', fontSize: 15 }
 });

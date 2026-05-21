@@ -1,229 +1,906 @@
 @extends('layouts.app')
+
 @section('title', 'Monitoring Pengawas - ' . $schedule->subject->nama_mapel)
 
+<style>
+
+    /* ================= BACKGROUND ================= */
+    body {
+
+        background-color: #f4f5f9 !important;
+
+        background-image:
+            radial-gradient(
+                rgba(230, 57, 70, 0.12) 1.5px,
+                transparent 1.5px
+            ),
+
+            linear-gradient(
+                135deg,
+                #fceade 0%,
+                #f4f5f9 50%,
+                #ffffff 100%
+            ) !important;
+
+        background-size:
+            24px 24px,
+            100% 100% !important;
+
+        background-attachment: fixed !important;
+    }
+
+    /* ================= WRAPPER ================= */
+    .monitor-wrapper {
+
+        padding: 10px;
+    }
+
+    /* ================= ALERT ================= */
+    .alert-success {
+
+        background:
+            rgba(16,185,129,0.12);
+
+        border:
+            1px solid rgba(16,185,129,0.2);
+
+        color: #065f46;
+
+        padding: 16px;
+
+        border-radius: 14px;
+
+        margin-bottom: 24px;
+
+        font-weight: 700;
+
+        backdrop-filter: blur(10px);
+    }
+
+    /* ================= HEADER ================= */
+    .monitor-header {
+
+        display: flex;
+
+        justify-content: space-between;
+
+        align-items: center;
+
+        margin-bottom: 28px;
+
+        gap: 20px;
+
+        flex-wrap: wrap;
+    }
+
+    .monitor-title {
+
+        margin: 0;
+
+        color: #1e293b;
+
+        font-size: 30px;
+
+        font-weight: 900;
+    }
+
+    .monitor-subtitle {
+
+        margin: 6px 0 0;
+
+        color: #64748b;
+
+        font-size: 14px;
+
+        font-weight: 600;
+    }
+
+    .header-actions {
+
+        display: flex;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+    }
+
+    .btn-header {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 8px;
+
+        padding: 12px 18px;
+
+        border-radius: 14px;
+
+        text-decoration: none;
+
+        font-weight: 700;
+
+        transition: 0.3s ease;
+    }
+
+    .btn-refresh {
+
+        background:
+            rgba(255,255,255,0.7);
+
+        border:
+            1px solid #e2e8f0;
+
+        color: #475569;
+    }
+
+    .btn-refresh:hover {
+
+        transform:
+            translateY(-2px);
+
+        background: #fff;
+    }
+
+    .btn-back {
+
+        background:
+            linear-gradient(
+                135deg,
+                #cd0000 0%,
+                #950000 100%
+            );
+
+        color: white;
+
+        box-shadow:
+            0 8px 20px rgba(205,0,0,0.22);
+    }
+
+    .btn-back:hover {
+
+        transform:
+            translateY(-3px);
+
+        box-shadow:
+            0 12px 28px rgba(205,0,0,0.32);
+
+        color: white;
+    }
+
+    /* ================= SUMMARY ================= */
+    .summary-grid {
+
+        display: grid;
+
+        grid-template-columns:
+            repeat(auto-fit, minmax(220px, 1fr));
+
+        gap: 22px;
+
+        margin-bottom: 30px;
+    }
+
+    .summary-card {
+
+        background:
+            rgba(255,255,255,0.78);
+
+        backdrop-filter: blur(10px);
+
+        border-radius: 22px;
+
+        padding: 24px;
+
+        border:
+            1px solid rgba(255,255,255,0.7);
+
+        box-shadow:
+            0 8px 22px rgba(0,0,0,0.04);
+
+        transition: 0.3s ease;
+    }
+
+    .summary-card:hover {
+
+        transform:
+            translateY(-5px);
+
+        box-shadow:
+            0 15px 35px rgba(205,0,0,0.10);
+    }
+
+    .summary-label {
+
+        font-size: 12px;
+
+        font-weight: 800;
+
+        text-transform: uppercase;
+
+        color: #64748b;
+
+        margin-bottom: 10px;
+
+        letter-spacing: 0.5px;
+    }
+
+    .summary-value {
+
+        font-size: 34px;
+
+        font-weight: 900;
+
+        color: #1e293b;
+    }
+
+    .border-blue {
+        border-left: 5px solid #3b82f6;
+    }
+
+    .border-green {
+        border-left: 5px solid #10b981;
+    }
+
+    .border-yellow {
+        border-left: 5px solid #f59e0b;
+    }
+
+    .border-red {
+        border-left: 5px solid #ef4444;
+    }
+
+    /* ================= CONTROL PANEL ================= */
+    .control-panel {
+
+        background:
+            rgba(255,255,255,0.75);
+
+        backdrop-filter: blur(12px);
+
+        border-radius: 24px;
+
+        padding: 24px;
+
+        margin-bottom: 30px;
+
+        display: flex;
+
+        flex-wrap: wrap;
+
+        gap: 40px;
+
+        border:
+            1px solid rgba(255,255,255,0.7);
+
+        box-shadow:
+            0 8px 22px rgba(0,0,0,0.04);
+    }
+
+    .control-item span {
+
+        display: block;
+    }
+
+    .control-label {
+
+        font-size: 11px;
+
+        font-weight: 800;
+
+        text-transform: uppercase;
+
+        margin-bottom: 6px;
+
+        color: #64748b;
+
+        letter-spacing: 0.5px;
+    }
+
+    .token-box {
+
+        font-size: 24px;
+
+        font-family: monospace;
+
+        font-weight: 900;
+
+        background: #1e293b;
+
+        color: #fff;
+
+        padding: 5px 14px;
+
+        border-radius: 10px;
+
+        display: inline-block;
+    }
+
+    .status-active {
+
+        color: #15803d;
+
+        font-size: 20px;
+
+        font-weight: 800;
+    }
+
+    .countdown {
+
+        font-size: 22px;
+
+        font-weight: 900;
+
+        color: #1e293b;
+    }
+
+    /* ================= TABLE ================= */
+    .table-wrapper {
+
+        background:
+            rgba(255,255,255,0.78);
+
+        backdrop-filter: blur(12px);
+
+        border-radius: 24px;
+
+        overflow: hidden;
+
+        border:
+            1px solid rgba(255,255,255,0.7);
+
+        box-shadow:
+            0 10px 28px rgba(0,0,0,0.05);
+    }
+
+    table {
+
+        width: 100%;
+
+        border-collapse: collapse;
+    }
+
+    thead tr {
+
+        background:
+            rgba(248,250,252,0.95);
+
+        border-bottom:
+            2px solid #e2e8f0;
+    }
+
+    th {
+
+        padding: 18px 20px;
+
+        color: #475569;
+
+        font-size: 13px;
+
+        text-transform: uppercase;
+
+        letter-spacing: 0.5px;
+
+        font-weight: 800;
+    }
+
+    td {
+
+        padding: 18px 20px;
+
+        border-bottom:
+            1px solid #f1f5f9;
+    }
+
+    tbody tr {
+
+        transition: 0.3s ease;
+    }
+
+    tbody tr:hover {
+
+        background:
+            rgba(205,0,0,0.03);
+    }
+
+    .student-name {
+
+        font-weight: 800;
+
+        color: #1e293b;
+    }
+
+    .student-nis {
+
+        font-size: 11px;
+
+        color: #94a3b8;
+
+        margin-top: 4px;
+    }
+
+    /* ================= BADGES ================= */
+    .badge {
+
+        padding: 6px 14px;
+
+        border-radius: 999px;
+
+        font-size: 11px;
+
+        font-weight: 800;
+
+        display: inline-block;
+    }
+
+    .badge-danger {
+
+        background: #fee2e2;
+
+        color: #ef4444;
+    }
+
+    .badge-success {
+
+        background: #dcfce7;
+
+        color: #15803d;
+    }
+
+    .badge-secondary {
+
+        background: #f1f5f9;
+
+        color: #64748b;
+    }
+
+    /* ================= PROGRESS ================= */
+    .progress-track {
+
+        width: 110px;
+
+        background: #e2e8f0;
+
+        height: 8px;
+
+        border-radius: 999px;
+
+        margin: 0 auto 6px;
+    }
+
+    .progress-fill {
+
+        height: 100%;
+
+        border-radius: 999px;
+    }
+
+    .progress-text {
+
+        font-size: 11px;
+
+        font-weight: 700;
+
+        color: #475569;
+    }
+
+    /* ================= ACTION ================= */
+    .btn-reset {
+
+        width: 36px;
+
+        height: 36px;
+
+        border-radius: 10px;
+
+        border: none;
+
+        background: #f59e0b;
+
+        color: white;
+
+        cursor: pointer;
+
+        transition: 0.3s ease;
+    }
+
+    .btn-reset:hover {
+
+        transform:
+            translateY(-2px);
+
+        box-shadow:
+            0 8px 18px rgba(245,158,11,0.28);
+    }
+
+    /* ================= RESPONSIVE ================= */
+    @media (max-width: 1024px) {
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            min-width: 1000px;
+        }
+
+    }
+
+</style>
+
 @section('content')
-<div style="padding: 10px;">
-    {{-- ALERT NOTIFIKASI --}}
+
+<div class="monitor-wrapper">
+
+    {{-- ALERT --}}
     @if(session('success'))
-        <div style="background: #d1fae5; border: 1px solid #10b981; color: #065f46; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 600;">
+
+        <div class="alert-success">
             {{ session('success') }}
         </div>
+
     @endif
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    {{-- HEADER --}}
+    <div class="monitor-header">
+
         <div>
-            <h2 style="margin: 0; color: #1e293b; font-size: 24px;">🛡️ Ruang Pengawas Live: {{ $schedule->subject->nama_mapel }}</h2>
-            <p style="margin: 5px 0 0; color: #64748b;">Kelas: <strong>{{ $schedule->classroom->nama_kelas }}</strong> | Pengawas: {{ auth()->user()->name }}</p>
+
+            <h2 class="monitor-title">
+                🛡️ Ruang Pengawas Live:
+                {{ $schedule->subject->nama_mapel }}
+            </h2>
+
+            <p class="monitor-subtitle">
+
+                Kelas:
+                <strong>
+                    {{ $schedule->classroom->nama_kelas }}
+                </strong>
+
+                |
+
+                Pengawas:
+                {{ auth()->user()->name }}
+
+            </p>
+
         </div>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="window.location.reload()" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; color: #475569;">
-                <i class="fas fa-sync-alt"></i> Refresh Manual
+
+        <div class="header-actions">
+
+            <button
+                onclick="window.location.reload()"
+                class="btn-header btn-refresh"
+            >
+
+                <i class="fas fa-sync-alt"></i>
+
+                Refresh
+
             </button>
-            <a href="{{ route('pengawas.dashboard') }}" style="background: #1e293b; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                Kembali ke Dashboard
+
+            <a
+                href="{{ route('pengawas.dashboard') }}"
+                class="btn-header btn-back"
+            >
+
+                Kembali Dashboard
+
             </a>
+
         </div>
+
     </div>
 
-    {{-- CARD SUMMARY STATISTIK --}}
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-left: 4px solid #3b82f6;">
-            <div style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Total Siswa</div>
-            <div id="stat-total" style="font-size: 28px; font-weight: 800; color: #1e293b;">{{ $students->count() }}</div>
+    {{-- SUMMARY --}}
+    <div class="summary-grid">
+
+        <div class="summary-card border-blue">
+
+            <div class="summary-label">
+                Total Siswa
+            </div>
+
+            <div
+                id="stat-total"
+                class="summary-value"
+            >
+
+                {{ $students->count() }}
+
+            </div>
+
         </div>
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-left: 4px solid #10b981;">
-            <div style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Sudah Selesai</div>
-            <div id="stat-selesai" style="font-size: 28px; font-weight: 800; color: #1e293b;">
+
+        <div class="summary-card border-green">
+
+            <div class="summary-label">
+                Sudah Selesai
+            </div>
+
+            <div
+                id="stat-selesai"
+                class="summary-value"
+            >
+
                 {{ $students->where('is_logged_in', 0)->where('total_dijawab', '>=', $schedule->questions_count ?? 1)->count() }}
+
             </div>
+
         </div>
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-left: 4px solid #f59e0b;">
-            <div style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Sedang Aktif</div>
-            <div id="stat-aktif" style="font-size: 28px; font-weight: 800; color: #1e293b;">
+
+        <div class="summary-card border-yellow">
+
+            <div class="summary-label">
+                Sedang Aktif
+            </div>
+
+            <div
+                id="stat-aktif"
+                class="summary-value"
+            >
+
                 {{ $students->where('is_logged_in', 1)->where('total_pelanggaran', 0)->count() }}
+
             </div>
+
         </div>
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-left: 4px solid #ef4444;">
-            <div style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Terdeteksi Melanggar</div>
-            <div id="stat-melanggar" style="font-size: 28px; font-weight: 800; color: #ef4444;">
+
+        <div class="summary-card border-red">
+
+            <div class="summary-label">
+                Terdeteksi Melanggar
+            </div>
+
+            <div
+                id="stat-melanggar"
+                class="summary-value"
+                style="color:#ef4444;"
+            >
+
                 {{ $students->where('total_pelanggaran', '>', 0)->count() }}
+
             </div>
+
         </div>
+
     </div>
 
-    {{-- PANEL CONTROL JADWAL --}}
-    <div style="background: #fff3f3; border: 1px solid #ffcccc; padding: 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; gap: 40px;">
-            <div>
-                <span style="display: block; font-size: 11px; color: #c91313; font-weight: 800; text-transform: uppercase;">Token Ujian</span>
-                <span style="font-size: 24px; font-family: monospace; font-weight: 800; color: #cyan; background: #1e293b; padding: 2px 10px; border-radius: 6px; color: #fff;">{{ $schedule->token }}</span>
-            </div>
-            <div>
-                <span style="display: block; font-size: 11px; color: #666; font-weight: 800; text-transform: uppercase;">Status Server</span>
-                <span style="font-size: 18px; font-weight: 700; color: {{ $schedule->status == 'aktif' ? '#15803d' : '#991b1b' }}">
-                    ● {{ strtoupper($schedule->status) }}
-                </span>
-            </div>
-            <div>
-                <span style="display: block; font-size: 11px; color: #666; font-weight: 800; text-transform: uppercase;">Waktu Tersisa</span>
-                <span id="countdown" style="font-size: 18px; font-weight: 700; color: #1e293b;">--:--:--</span>
-            </div>
+    {{-- CONTROL PANEL --}}
+    <div class="control-panel">
+
+        <div class="control-item">
+
+            <span class="control-label">
+                Token Ujian
+            </span>
+
+            <span class="token-box">
+                {{ $schedule->token }}
+            </span>
+
         </div>
+
+        <div class="control-item">
+
+            <span class="control-label">
+                Status Server
+            </span>
+
+            <span class="status-active">
+
+                ● {{ strtoupper($schedule->status) }}
+
+            </span>
+
+        </div>
+
+        <div class="control-item">
+
+            <span class="control-label">
+                Waktu Tersisa
+            </span>
+
+            <span
+                id="countdown"
+                class="countdown"
+            >
+
+                --:--:--
+
+            </span>
+
+        </div>
+
     </div>
 
-    {{-- TABEL MONITORING LIVE --}}
-    <div class="content-box" style="background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+    {{-- TABLE --}}
+    <div class="table-wrapper">
+
+        <table>
+
             <thead>
-                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px;">No</th>
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px;">NIS & Nama Siswa</th>
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px; text-align: center;">Status</th>
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px; text-align: center;">Progress</th>
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px; text-align: center;">Pelanggaran</th>
-                    <th style="padding: 15px 20px; color: #475569; font-size: 13px; text-align: center;">Aksi</th>
+
+                <tr>
+
+                    <th>No</th>
+
+                    <th>
+                        NIS & Nama Siswa
+                    </th>
+
+                    <th style="text-align:center;">
+                        Status
+                    </th>
+
+                    <th style="text-align:center;">
+                        Progress
+                    </th>
+
+                    <th style="text-align:center;">
+                        Pelanggaran
+                    </th>
+
+                    <th style="text-align:center;">
+                        Aksi
+                    </th>
+
                 </tr>
+
             </thead>
+
             <tbody id="student-table-body">
+
                 @foreach($students as $index => $student)
+
                 @php
-                    $totalSoal = $schedule->questions_count ?? count($schedule->questions ?? []);
-                    $totalSoal = $totalSoal > 0 ? $totalSoal : 1; 
-                    $persentase = round(($student->total_dijawab / $totalSoal) * 100);
+
+                    $totalSoal =
+                        $schedule->questions_count ??
+                        count($schedule->questions ?? []);
+
+                    $totalSoal =
+                        $totalSoal > 0
+                        ? $totalSoal
+                        : 1;
+
+                    $persentase =
+                        round(
+                            ($student->total_dijawab / $totalSoal) * 100
+                        );
+
                 @endphp
-                <tr id="student-row-{{ $student->id }}" style="border-bottom: 1px solid #f1f5f9; transition: background 0.5s; background: {{ $student->total_pelanggaran > 0 ? '#fff5f5' : 'transparent' }}">
-                    <td style="padding: 15px 20px; color: #64748b;">{{ $index + 1 }}</td>
-                    <td style="padding: 15px 20px;">
-                        <div style="font-weight: 700; color: #1e293b;">{{ $student->name }}</div>
-                        <div style="font-size: 11px; color: #94a3b8;">NIS: {{ $student->nis ?? '-' }}</div>
+
+                <tr
+                    id="student-row-{{ $student->id }}"
+                    style="
+                        background:
+                        {{ $student->total_pelanggaran > 0 ? '#fff5f5' : 'transparent' }}
+                    "
+                >
+
+                    <td>
+                        {{ $index + 1 }}
                     </td>
-                    <td class="student-status-cell" style="padding: 15px 20px; text-align: center;">
+
+                    <td>
+
+                        <div class="student-name">
+                            {{ $student->name }}
+                        </div>
+
+                        <div class="student-nis">
+                            NIS:
+                            {{ $student->nis ?? '-' }}
+                        </div>
+
+                    </td>
+
+                    <td
+                        class="student-status-cell"
+                        style="text-align:center;"
+                    >
+
                         @if($student->total_pelanggaran > 0)
-                            <span style="background: #fee2e2; color: #ef4444; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">🛑 DISKUALIFIKASI</span>
+
+                            <span class="badge badge-danger">
+                                🛑 DISKUALIFIKASI
+                            </span>
+
                         @elseif($student->is_logged_in == 1)
-                            <span style="background: #dcfce7; color: #15803d; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">✍️ MENGERJAKAN</span>
+
+                            <span class="badge badge-success">
+                                ✍️ MENGERJAKAN
+                            </span>
+
                         @else
-                            <span style="background: #f1f5f9; color: #64748b; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">💤 BELUM LOGIN</span>
+
+                            <span class="badge badge-secondary">
+                                💤 BELUM LOGIN
+                            </span>
+
                         @endif
+
                     </td>
-                    <td class="student-progress-cell" style="padding: 15px 20px; text-align: center;">
-                        <div style="width: 100px; background: #e2e8f0; height: 8px; border-radius: 10px; margin: 0 auto 4px;">
-                            <div class="progress-bar-fill" style="width: {{ $persentase }}%; background: {{ $persentase == 100 ? '#10b981' : '#3b82f6' }}; height: 100%; border-radius: 10px;"></div>
+
+                    <td
+                        class="student-progress-cell"
+                        style="text-align:center;"
+                    >
+
+                        <div class="progress-track">
+
+                            <div
+                                class="progress-bar-fill progress-fill"
+                                style="
+                                    width: {{ $persentase }}%;
+                                    background:
+                                    {{ $persentase == 100 ? '#10b981' : '#3b82f6' }};
+                                "
+                            ></div>
+
                         </div>
-                        <span class="progress-text" style="font-size: 11px; font-weight: 700; color: #475569;">{{ $student->total_dijawab }} / {{ $totalSoal }} Soal ({{ $persentase }}%)</span>
+
+                        <span class="progress-text">
+
+                            {{ $student->total_dijawab }}
+                            /
+                            {{ $totalSoal }}
+                            Soal
+                            ({{ $persentase }}%)
+
+                        </span>
+
                     </td>
-                    <td class="student-violation-cell" style="padding: 15px 20px; text-align: center; font-weight: bold; color: {{ $student->total_pelanggaran > 0 ? '#ef4444' : '#64748b' }}">
+
+                    <td
+                        class="student-violation-cell"
+                        style="
+                            text-align:center;
+                            font-weight:800;
+                            color:
+                            {{ $student->total_pelanggaran > 0 ? '#ef4444' : '#64748b' }}
+                        "
+                    >
+
                         {{ $student->total_pelanggaran > 0 ? '⚠️ ' . $student->total_pelanggaran . 'x Keluar App' : '-' }}
+
                     </td>
-                    <td style="padding: 15px 20px; text-align: center;">
-                        <div style="display: flex; gap: 5px; justify-content: center;">
-                            <form action="{{ route('pengawas.monitoring.reset', [$schedule->id, $student->id]) }}" method="POST" onsubmit="return confirm('Yakin ingin mereset hak akses login siswa ini?')">
-                                @csrf
-                                <button type="submit" title="Reset Device / Izinkan Login Kembali" style="background: #f59e0b; color: white; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer;">
-                                    <i class="fas fa-undo"></i>
-                                </button>
-                            </form>
-                        </div>
+
+                    <td style="text-align:center;">
+
+                        <form
+                            action="{{ route('pengawas.monitoring.reset', [$schedule->id, $student->id]) }}"
+                            method="POST"
+                            onsubmit="return confirm('Yakin reset login siswa ini?')"
+                        >
+
+                            @csrf
+
+                            <button
+                                type="submit"
+                                class="btn-reset"
+                            >
+
+                                <i class="fas fa-undo"></i>
+
+                            </button>
+
+                        </form>
+
                     </td>
+
                 </tr>
+
                 @endforeach
+
             </tbody>
+
         </table>
+
     </div>
+
 </div>
 
-{{-- SCRIPT SINKRONISASI REALTIME & COUNTDOWN --}}
-@vite(['resources/js/app.js']) {{-- Memastikan bundling Laravel Echo dipanggil --}}
-<script>
-    // 1. Logika Countdown Penutup Ujian
-    const endTime = new Date("{{ $schedule->tanggal_ujian }} {{ $schedule->jam_selesai }}").getTime();
-    const countdownInterval = setInterval(function() {
-        const now = new Date().getTime();
-        const distance = endTime - now;
-        if (distance < 0) {
-            clearInterval(countdownInterval);
-            document.getElementById("countdown").innerHTML = "WAKTU HABIS";
-            document.getElementById("countdown").style.color = "#ef4444";
-            return;
-        }
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        document.getElementById("countdown").innerHTML = String(hours).padStart(2, '0') + ":" + String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
-    }, 1000);
-
-    // 2. Logika Realtime Monitoring via Laravel Echo & Reverb
-    document.addEventListener('DOMContentLoaded', function () {
-        const scheduleId = "{{ $schedule->id }}";
-        const totalSoalGlobal = parseInt("{{ $totalSoal }}") || 1;
-
-        if (window.Echo) {
-            window.Echo.channel(`exam-monitoring.${scheduleId}`)
-                .listen('.ExamStateUpdated', (e) => {
-                    // Cari baris tabel siswa berdasarkan ID siswa yang dikirim WebSocket
-                    const row = document.getElementById(`student-row-${e.student_id}`);
-                    if (!row) return;
-
-                    // Efek flash warna kuning penanda data masuk
-                    row.style.background = '#fef08a';
-                    setTimeout(() => {
-                        row.style.background = e.total_pelanggaran > 0 ? '#fff5f5' : 'transparent';
-                    }, 1000);
-
-                    // Update Kolom Status
-                    const statusCell = row.querySelector('.student-status-cell');
-                    if (e.total_pelanggaran > 0) {
-                        statusCell.innerHTML = `<span style="background: #fee2e2; color: #ef4444; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">🛑 DISKUALIFIKASI</span>`;
-                    } else if (e.is_logged_in == 1) {
-                        statusCell.innerHTML = `<span style="background: #dcfce7; color: #15803d; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">✍️ MENGERJAKAN</span>`;
-                    } else {
-                        statusCell.innerHTML = `<span style="background: #f1f5f9; color: #64748b; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800;">💤 BELUM LOGIN</span>`;
-                    }
-
-                    // Update Kolom Progress Jawaban
-                    const hitungPersen = Math.round((e.total_dijawab / totalSoalGlobal) * 100);
-                    row.querySelector('.progress-bar-fill').style.width = `${hitungPersen}%`;
-                    row.querySelector('.progress-bar-fill').style.background = hitungPersen === 100 ? '#10b981' : '#3b82f6';
-                    row.querySelector('.progress-text').innerText = `${e.total_dijawab} / ${totalSoalGlobal} Soal (${hitungPersen}%)`;
-
-                    // Update Kolom Pelanggaran
-                    const violationCell = row.querySelector('.student-violation-cell');
-                    if (e.total_pelanggaran > 0) {
-                        violationCell.innerText = `⚠️ ${e.total_pelanggaran}x Keluar App`;
-                        violationCell.style.color = '#ef4444';
-                    } else {
-                        violationCell.innerText = '-';
-                        violationCell.style.color = '#64748b';
-                    }
-
-                    // Re-calculate ringkasan statistik di atas card
-                    updateSummaryCards();
-                });
-        }
-
-        function updateSummaryCards() {
-            // Logika client-side counting ringkas berdasarkan perubahan baris tabel
-            const totalSiswa = document.querySelectorAll('#student-table-body tr').length;
-            let totalSelesai = 0, totalAktif = 0, totalMelanggar = 0;
-
-            document.querySelectorAll('#student-table-body tr').forEach(row => {
-                const textPelanggaran = row.querySelector('.student-violation-cell').innerText;
-                const textStatus = row.querySelector('.student-status-cell').innerText;
-
-                if (textPelanggaran.includes('Keluar App')) {
-                    totalMelanggar++;
-                }
-                if (textStatus.includes('MENGERJAKAN') && !textPelanggaran.includes('Keluar App')) {
-                    totalAktif++;
-                }
-                if (textStatus.includes('BELUM LOGIN') && row.querySelector('.progress-text').innerText.includes('100%')) {
-                    totalSelesai++;
-                }
-            });
-
-            document.getElementById('stat-aktif').innerText = totalAktif;
-            document.getElementById('stat-melanggar').innerText = totalMelanggar;
-        }
-    });
-</script>
 @endsection

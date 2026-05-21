@@ -1,275 +1,538 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  Alert, 
+import React, {
+  useState,
+  useEffect,
+  useRef
+} from 'react';
+
+import {
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  StatusBar
+  StatusBar,
+  Image,
+  Animated,
 } from 'react-native';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Konfigurasi API Axios kamu
-import api from '../../src/api/axiosConfig'; 
+import {
+  User,
+  Lock,
+  LogIn,
+} from 'lucide-react-native';
+
+import api from '../../src/api/axiosConfig';
 
 export default function LoginScreen() {
+
   const [nis, setNis] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [nisFocused, setNisFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+
   const router = useRouter();
 
+  // FLOATING LOGO
+  const floatAnim = useRef(
+    new Animated.Value(0)
+  ).current;
+
+  useEffect(() => {
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+  }, []);
+
   const handleLogin = async () => {
+
     if (!nis || !password) {
-      Alert.alert('Peringatan', 'NIS dan Password harus diisi');
+
+      Alert.alert(
+        'Peringatan',
+        'NIS dan Password harus diisi'
+      );
+
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await api.post('/login', {
-        nis: nis,
-        password: password,
-      });
 
-      const token = response.data.access_token;
-      await AsyncStorage.setItem('userToken', token);
+      const response = await api.post(
+        '/login',
+        {
+          nis,
+          password,
+        }
+      );
 
-      console.log("Login Berhasil!");
-      router.replace('/(tabs)'); 
+      const token =
+        response.data.access_token;
+
+      await AsyncStorage.setItem(
+        'userToken',
+        token
+      );
+
+      router.replace('/(tabs)');
 
     } catch (error: any) {
-      console.log("Login Error Log:", error.response?.status, error.response?.data);
 
       if (error.response) {
-        const statusCode = error.response.status;
-        const serverMessage = error.response.data.message;
 
-        if (statusCode === 403) {
+        const statusCode =
+          error.response.status;
+
+        const serverMessage =
+          error.response.data.message;
+
+        if (statusCode === 401) {
+
           Alert.alert(
-            'Akses Ditolak', 
-            serverMessage || 'Akun Anda terdeteksi sedang aktif di perangkat lain. Silahkan logout terlebih dahulu atau hubungi proktor.'
+            'Login Gagal',
+            serverMessage ||
+            'NIS atau Password salah'
           );
-        } else if (statusCode === 401) {
-          Alert.alert('Login Gagal', serverMessage || 'NIS atau Password salah');
+
         } else {
-          Alert.alert('Gagal', serverMessage || `Terjadi kesalahan pada server (Error: ${statusCode})`);
+
+          Alert.alert(
+            'Gagal',
+            serverMessage ||
+            'Terjadi kesalahan server'
+          );
+
         }
-      } else if (error.request) {
-        Alert.alert('Gagal Jaringan', 'Server tidak merespons. Pastikan IP di axiosConfig sudah benar dan PC Server menyala.');
+
       } else {
-        Alert.alert('Error', 'Terjadi kesalahan sistem internal.');
+
+        Alert.alert(
+          'Gagal',
+          'Server tidak merespons'
+        );
+
       }
+
     } finally {
+
       setLoading(false);
+
     }
+
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+
+    <LinearGradient
+      colors={[
+        '#ffe8e8',
+        '#f4f5f9',
+        '#ffffff'
+      ]}
+      style={styles.gradient}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
-      
-      {/* Ornamen Estetik Latar Belakang */}
-      <View style={[styles.circleDecor, { top: -100, right: -100, backgroundColor: '#dbeafe' }]} />
-      <View style={[styles.circleDecor, { bottom: -150, left: -100, backgroundColor: '#eff6ff' }]} />
 
-      <View style={styles.headerSection}>
-        <Text style={styles.brandTitle}>SEB<Text style={styles.brandAccent}>STAR</Text></Text>
-        <Text style={styles.brandSubtitle}>Computer Assisted Test Platform</Text>
-      </View>
+      {/* POLKADOT */}
+      <View style={styles.dotsContainer}>
 
-      <View style={styles.formContainer}>
-        <Text style={styles.loginHeader}>Silahkan Masuk</Text>
-        <Text style={styles.loginSubheader}>Gunakan nomor induk siswa resmi dari sekolah</Text>
+        {[...Array(150)].map((_, index) => (
 
-        {/* Input NIS */}
-        <Text style={styles.inputLabel}>Nomor Induk Siswa (NIS)</Text>
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputIcon}>👤</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Contoh: 212210234" 
-            placeholderTextColor="#94a3b8"
-            value={nis} 
-            onChangeText={setNis}
-            keyboardType="numeric"
-            autoCapitalize="none"
+          <View
+            key={index}
+            style={[
+              styles.dot,
+              {
+                left: Math.random() * 400,
+                top: Math.random() * 900,
+              }
+            ]}
           />
-        </View>
-        
-        {/* Input Password */}
-        <Text style={styles.inputLabel}>Kata Sandi</Text>
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputIcon}>🔒</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Masukkan kata sandi Anda" 
-            placeholderTextColor="#94a3b8"
-            value={password} 
-            onChangeText={setPassword}
-            secureTextEntry 
-            autoCapitalize="none"
-          />
-        </View>
 
-        {/* Tombol Masuk */}
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>MASUK KE UJIAN</Text>
-          )}
-        </TouchableOpacity>
+        ))}
+
       </View>
 
-      <View style={styles.footerContainer}>
-        <Text style={styles.footerText}>Secure Exam Browser Node</Text>
-        <Text style={styles.schoolText}>SMKN 1 BINONG</Text>
-      </View>
-    </KeyboardAvoidingView>
+      <KeyboardAvoidingView
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : 'height'
+        }
+        style={styles.container}
+      >
+
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#ffe8e8"
+        />
+
+        {/* CARD */}
+        <View style={styles.card}>
+
+          {/* HEADER */}
+          <Animated.View
+            style={[
+              styles.header,
+              {
+                transform: [
+                  {
+                    translateY: floatAnim
+                  }
+                ]
+              }
+            ]}
+          >
+
+            <Image
+              source={require('../../assets/images/LOGO.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+
+            <Text style={styles.title}>
+              SEBSTAR
+            </Text>
+
+            <Text style={styles.subtitle}>
+              Sistem Ujian Digital
+            </Text>
+
+          </Animated.View>
+
+          {/* INPUT NIS */}
+          <View
+            style={[
+              styles.inputGroup,
+              nisFocused &&
+              styles.inputFocused
+            ]}
+          >
+
+            <User
+              size={18}
+              color={
+                nisFocused
+                  ? '#cd0000'
+                  : '#a0a0b0'
+              }
+              style={styles.icon}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Masukkan NIS"
+              placeholderTextColor="#999"
+              value={nis}
+              onChangeText={setNis}
+              keyboardType="numeric"
+              onFocus={() =>
+                setNisFocused(true)
+              }
+              onBlur={() =>
+                setNisFocused(false)
+              }
+            />
+
+          </View>
+
+          {/* INPUT PASSWORD */}
+          <View
+            style={[
+              styles.inputGroup,
+              passwordFocused &&
+              styles.inputFocused
+            ]}
+          >
+
+            <Lock
+              size={18}
+              color={
+                passwordFocused
+                  ? '#cd0000'
+                  : '#a0a0b0'
+              }
+              style={styles.icon}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Masukkan Password"
+              placeholderTextColor="#999"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              onFocus={() =>
+                setPasswordFocused(true)
+              }
+              onBlur={() =>
+                setPasswordFocused(false)
+              }
+            />
+
+          </View>
+
+          {/* BUTTON */}
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+
+            {loading ? (
+
+              <ActivityIndicator
+                color="#fff"
+              />
+
+            ) : (
+
+              <View
+                style={
+                  styles.buttonContent
+                }
+              >
+
+                <Text
+                  style={
+                    styles.buttonText
+                  }
+                >
+                  MASUK SISTEM
+                </Text>
+
+                <LogIn
+                  size={18}
+                  color="#fff"
+                />
+
+              </View>
+
+            )}
+
+          </TouchableOpacity>
+
+        </View>
+
+      </KeyboardAvoidingView>
+
+    </LinearGradient>
+
   );
+
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    backgroundColor: '#f8fafc', // Warna dasar putih abu slate yang bersih
-    paddingHorizontal: 20
+
+  gradient: {
+    flex: 1,
   },
-  circleDecor: {
+
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+
+  // POLKADOT
+  dotsContainer: {
     position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    opacity: 0.6,
+    width: '100%',
+    height: '100%',
   },
-  headerSection: {
-    alignItems: 'center',
-    marginBottom: 35
+
+  dot: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor:
+      'rgba(205,0,0,0.12)',
   },
-  brandTitle: { 
-    fontSize: 40, 
-    fontWeight: '900', 
-    color: '#1e293b',
-    letterSpacing: 3,
-  },
-  brandAccent: {
-    color: '#2563eb' // Warna biru aksen cerah
-  },
-  brandSubtitle: { 
-    fontSize: 13, 
-    color: '#64748b',
-    marginTop: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    fontWeight: '600'
-  },
-  formContainer: {
-    padding: 28,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    elevation: 8,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
+
+  // CARD
+  card: {
+
+    backgroundColor:
+      'rgba(255,255,255,0.58)',
+
+    borderRadius: 30,
+
+    padding: 30,
+
     borderWidth: 1,
-    borderColor: '#f1f5f9'
+    borderColor:
+      'rgba(255,255,255,0.7)',
+
+    shadowColor: '#000',
+
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+
+    shadowOpacity: 0.1,
+
+    shadowRadius: 25,
+
+    elevation: 10,
+
+    overflow: 'hidden',
   },
-  loginHeader: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a'
+
+  // HEADER
+  header: {
+    alignItems: 'center',
+    marginBottom: 28,
   },
-  loginSubheader: {
+
+  logo: {
+    width: 90,
+    height: 90,
+    marginBottom: 15,
+  },
+
+  title: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#1e1e2f',
+    letterSpacing: 2,
+  },
+
+  subtitle: {
+    marginTop: 6,
     fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
-    marginBottom: 24,
-    lineHeight: 18
-  },
-  inputLabel: {
-    fontSize: 12,
+    color: '#cd0000',
     fontWeight: '700',
-    color: '#475569',
-    marginBottom: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.5
+    letterSpacing: 1,
   },
-  inputWrapper: {
+
+  // INPUT
+  inputGroup: {
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    backgroundColor:
+      'rgba(255,255,255,0.9)',
+
+    borderWidth: 1,
+
+    borderColor:
+      'rgba(0,0,0,0.08)',
+
+    borderRadius: 16,
+
+    paddingHorizontal: 16,
+
+    marginBottom: 18,
+
+    transitionDuration: '300ms',
+  },
+
+  inputFocused: {
+
+    borderColor: '#cd0000',
+
+    backgroundColor: '#fff',
+
+    shadowColor: '#cd0000',
+
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+
+    shadowOpacity: 0.15,
+
+    shadowRadius: 10,
+
+    elevation: 4,
+
+    transform: [
+      {
+        scale: 1.02
+      }
+    ],
+  },
+
+  icon: {
+    marginRight: 10,
+  },
+
+  input: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: 14,
+    color: '#1e1e2f',
+    fontWeight: '600',
+  },
+
+  // BUTTON
+  button: {
+
+    marginTop: 10,
+
+    backgroundColor: '#cd0000',
+
+    borderRadius: 16,
+
+    paddingVertical: 16,
+
+    alignItems: 'center',
+
+    shadowColor: '#cd0000',
+
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+
+    shadowOpacity: 0.3,
+
+    shadowRadius: 10,
+
+    elevation: 5,
+  },
+
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
-    backgroundColor: '#f8fafc',
-    marginBottom: 18,
-    paddingHorizontal: 14,
+    gap: 8,
   },
-  inputIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    color: '#64748b'
-  },
-  input: { 
-    flex: 1,
-    paddingVertical: 14, 
+
+  buttonText: {
+    color: '#fff',
     fontSize: 15,
-    color: '#0f172a',
-    fontWeight: '500'
-  },
-  button: { 
-    backgroundColor: '#2563eb', 
-    padding: 16, 
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3
-  },
-  buttonDisabled: { 
-    backgroundColor: '#93c5fd',
-    shadowOpacity: 0
-  },
-  buttonText: { 
-    color: '#fff', 
-    fontSize: 15, 
-    fontWeight: '700', 
-    letterSpacing: 1
-  },
-  footerContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: 'center'
-  },
-  footerText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '500'
-  },
-  schoolText: {
-    color: '#64748b',
-    fontSize: 13,
     fontWeight: '700',
-    marginTop: 2,
-    letterSpacing: 1
-  }
+    letterSpacing: 1,
+  },
+
 });

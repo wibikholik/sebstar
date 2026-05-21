@@ -1,35 +1,104 @@
 @extends('layouts.app')
 @section('title', 'Manajemen Jadwal Ujian')
 
+<style>
+    /* Background dengan Gradasi Merah-Putih Tegas + Efek Polkadot Grid Modern */
+    body {
+        background-color: #f4f5f9 !important;
+        background-image: 
+            radial-gradient(rgba(230, 57, 70, 0.15) 1.5px, transparent 1.5px), 
+            linear-gradient(135deg, #fceade 0%, #f4f5f9 50%, #ffffff 100%) !important;
+        background-size: 24px 24px, 100% 100% !important;
+        background-attachment: fixed !important;
+    }
+
+    /* Pembungkus Konten Box Putih Premium */
+    .content-box-premium {
+        background: #ffffff !important;
+        border-radius: 16px !important;
+        padding: 25px !important;
+        margin-bottom: 30px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* Tombol Action Gradasi Merah Dashboard */
+    .btn-action-premium {
+        background: linear-gradient(135deg, #cd0000 0%, #950000 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        border-radius: 30px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        box-shadow: 0 5px 15px rgba(205, 0, 0, 0.25) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .btn-action-premium:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 22px rgba(205, 0, 0, 0.4) !important;
+        filter: brightness(1.1) !important;
+    }
+
+    /* Input & Select Filter Style */
+    .filter-input-premium {
+        width: 100%; 
+        padding: 11px 16px; 
+        border: 1px solid #cbd5e1; 
+        border-radius: 10px; 
+        font-size: 13px; 
+        font-weight: 600; 
+        color: #1e1e2f; 
+        outline: none; 
+        background: white; 
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+    }
+    
+    .filter-input-premium:focus {
+        border-color: #cd0000;
+        box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1);
+    }
+</style>
+
 @section('content')
-<div class="content-box" style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+<div class="content-box-premium">
     
     {{-- Header --}}
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-        <div>
-            <h3 style="margin: 0; color: #0f172a; font-weight: 700; font-size: 24px;">Jadwal Pelaksanaan Ujian</h3>
-            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Manajemen durasi pengerjaan, mata pelajaran, dan plotting pengawas.</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 20px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div>
+                <h3 style="margin: 0; color: #1e1e2f; font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-calendar-alt" style="color: #cd0000;"></i> Jadwal Pelaksanaan Ujian
+                </h3>
+                <p style="margin: 4px 0 0 0; color: #6a6a7a; font-size: 13px; font-weight: 600;">Manajemen durasi pengerjaan, mata pelajaran, dan plotting pengawas.</p>
+            </div>
         </div>
-        <button onclick="openScheduleModal()" style="background: #c91313; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(201, 19, 19, 0.2);">
-            + Tambah Jadwal
+        <button onclick="openScheduleModal()" class="btn-action-premium">
+            <i class="fas fa-plus"></i> Tambah Jadwal
         </button>
     </div>
 
     {{-- Alert Notifikasi --}}
     @if(session('success'))
-        <div style="background: #dcfce7; border-left: 4px solid #15803d; color: #15803d; padding: 16px; border-radius: 8px; margin-bottom: 25px; font-weight: 500;">
+        <div style="background: rgba(46, 204, 113, 0.1); border-left: 4px solid #2ecc71; color: #27ae60; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-weight: 600; font-size: 13px;">
             ✓ {{ session('success') }}
         </div>
     @endif
 
     {{-- Filter & Search --}}
-    <div style="background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 25px;">
+    <div style="background: #fafafa; padding: 18px; border-radius: 12px; border: 1px solid #edf0f5; margin-bottom: 25px;">
         <form action="{{ route('admin.schedules.index') }}" method="GET" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
-            <div style="flex: 1; min-width: 200px;">
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Mapel atau Token..." style="width: 100%; padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none;">
+            <div style="flex: 1; min-width: 220px;">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Mapel atau Token..." class="filter-input-premium">
             </div>
             <div>
-                <select name="exam_type_id" style="padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: white;">
+                <select name="exam_type_id" class="filter-input-premium" style="min-width: 180px; cursor: pointer;">
                     <option value="">Semua Jenis Ujian</option>
                     @foreach($examTypes as $et)
                         <option value="{{ $et->id }}" {{ request('exam_type_id') == $et->id ? 'selected' : '' }}>{{ $et->name }}</option>
@@ -37,87 +106,93 @@
                 </select>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button type="submit" style="background: #1e293b; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">Cari</button>
+                <button type="submit" style="background: #1e293b; color: white; border: none; padding: 11px 22px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 13px;">Cari</button>
                 @if(request()->anyFilled(['search', 'exam_type_id', 'status']))
-                    <a href="{{ route('admin.schedules.index') }}" style="background: #e2e8f0; color: #475569; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600;">Reset</a>
+                    <a href="{{ route('admin.schedules.index') }}" style="background: #e2e8f0; color: #475569; text-decoration: none; padding: 11px 22px; border-radius: 10px; font-weight: 700; font-size: 13px; display: inline-block; line-height: 1.2;">Reset</a>
                 @endif
             </div>
         </form>
     </div>
 
-    {{-- Table --}}
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: separate; border-spacing: 0;">
+    {{-- Table Area --}}
+    <div style="overflow-x: auto; background: white; border-radius: 12px; border: 1px solid #edf0f5;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
-                <tr style="background: #f8fafc; text-align: left;">
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px;">UJIAN & KELAS</th>
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px;">PENGAMPU & PENGAWAS</th>
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px;">WAKTU & DURASI</th>
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px; text-align: center;">TOKEN</th>
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px; text-align: center;">STATUS</th>
-                    <th style="padding: 16px; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 13px; text-align: center;">AKSI</th>
+                <tr style="background: #fafafa; border-bottom: 2px solid #edf0f5;">
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">UJIAN & KELAS</th>
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">PENGAMPU & PENGAWAS</th>
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">WAKTU & DURASI</th>
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">TOKEN</th>
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">STATUS</th>
+                    <th style="padding: 16px 20px; color: #6a6a7a; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">AKSI</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color: #1e1e2f;">
                 @forelse($schedules as $s)
-                <tr>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9;">
-                        <span style="font-size: 10px; background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 20px; font-weight: 700; display: inline-block; margin-bottom: 5px;">
+                <tr style="border-bottom: 1px solid #edf0f5; transition: background 0.2s;">
+                    <td style="padding: 18px 20px; vertical-align: top;">
+                        <span style="font-size: 10px; background: rgba(230, 57, 70, 0.1); color: #cd0000; padding: 4px 10px; border-radius: 20px; font-weight: 700; display: inline-block; margin-bottom: 6px;">
                             {{ $s->examType->name ?? 'N/A' }}
                         </span>
-                        <div style="font-weight: 700; color: #0f172a; font-size: 16px;">{{ $s->subject->nama_mapel }}</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">Kelas {{ $s->classroom->nama_kelas }}</span>
+                        <div style="font-weight: 700; font-size: 15px;">{{ $s->subject->nama_mapel ?? 'Mapel Terhapus' }}</div>
+                        <div style="font-size: 12px; color: #6a6a7a; margin-top: 5px; font-weight: 600;">
+                            <span style="background: #fafafa; padding: 3px 8px; border-radius: 6px; border: 1px solid #edf0f5;">Kelas {{ $s->classroom->nama_kelas ?? 'N/A' }}</span>
                         </div>
                     </td>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 18px 20px; vertical-align: top;">
                         <div style="margin-bottom: 8px;">
-                            <small style="color: #94a3b8; display: block; font-size: 11px;">PENGAMPU:</small>
+                            <small style="color: #a0a0b0; display: block; font-size: 10px; font-weight: 700;">PENGAMPU:</small>
                             @php 
                                 $teacherIds = is_array($s->teacher_ids) ? $s->teacher_ids : json_decode($s->teacher_ids, true);
                                 $teachers_list = \App\Models\User::whereIn('id', $teacherIds ?? [])->get(); 
                             @endphp
-                            @foreach($teachers_list as $t)
-                                <span style="font-size: 12px; font-weight: 500;">{{ $t->name }}</span>{{ !$loop->last ? ', ' : '' }}
-                            @endforeach
+                            @forelse($teachers_list as $t)
+                                <span style="font-size: 13px; font-weight: 600; color: #1e1e2f;">{{ $t->name }}</span>{{ !$loop->last ? ', ' : '' }}
+                            @empty
+                                <span style="font-size: 12px; color: #cbd5e1; font-style: italic;">Belum diplot</span>
+                            @endforelse
                         </div>
                         <div>
-                            <small style="color: #94a3b8; display: block; font-size: 11px;">PENGAWAS:</small>
-                            <span style="font-size: 12px; font-weight: 700; color: #c91313;">{{ $s->proctor->name ?? 'N/A' }}</span>
+                            <small style="color: #a0a0b0; display: block; font-size: 10px; font-weight: 700;">PENGAWAS:</small>
+                            <span style="font-size: 13px; font-weight: 700; color: #cd0000;">{{ $s->proctor->name ?? 'N/A' }}</span>
                         </div>
                     </td>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9;">
-                        {{-- Format Tanggal Indonesia --}}
-                        <div style="font-size: 14px; font-weight: 600;">📅 {{ \Carbon\Carbon::parse($s->tanggal_ujian)->translatedFormat('d F Y') }}</div>
-                        <div style="font-size: 13px; color: #c91313; background: #fff1f2; padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 5px; font-weight: 700;">
+                    <td style="padding: 18px 20px; vertical-align: top;">
+                        <div style="font-size: 13px; font-weight: 700; color: #1e1e2f;">📅 {{ \Carbon\Carbon::parse($s->tanggal_ujian)->translatedFormat('d F Y') }}</div>
+                        <div style="font-size: 11px; color: #cd0000; background: rgba(230, 57, 70, 0.08); padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 6px; font-weight: 700; border: 1px solid rgba(230, 57, 70, 0.15);">
                             ⏱️ {{ $s->durasi }} Menit
                         </div>
                     </td>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                        <span style="font-family: monospace; font-size: 15px; font-weight: 800; background: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 8px; border: 1px dashed #f59e0b;">{{ $s->token }}</span>
+                    <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
+                        <span style="font-family: monospace; font-size: 14px; font-weight: 700; background: #fffbeb; color: #b45309; padding: 6px 12px; border-radius: 8px; border: 1px dashed #f59e0b; letter-spacing: 0.5px;">{{ $s->token }}</span>
                     </td>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                    <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
                         <form action="{{ route('admin.schedules.status', $s->id) }}" method="POST">
                             @csrf
-                            <select name="status" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; {{ $s->status == 'aktif' ? 'background: #dcfce7; color: #15803d;' : 'background: #fee2e2; color: #991b1b;' }}">
+                            <select name="status" onchange="this.form.submit()" style="padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid transparent; cursor: pointer; {{ $s->status == 'aktif' ? 'background: rgba(46, 204, 113, 0.15); color: #27ae60;' : 'background: rgba(231, 76, 60, 0.1); color: #c0392b;' }}">
                                 <option value="aktif" {{ $s->status == 'aktif' ? 'selected' : '' }}>AKTIF</option>
                                 <option value="nonaktif" {{ $s->status == 'nonaktif' ? 'selected' : '' }}>OFF</option>
                             </select>
                         </form>
                     </td>
-                    <td style="padding: 16px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                        <div style="display: flex; gap: 5px; justify-content: center;">
-                            <button type="button" onclick='openEditModal(@json($s))' style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; cursor: pointer;">✏️</button>
-                            <a href="{{ route('admin.questions.index', $s->id) }}" style="text-decoration: none; background: #1e293b; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">📝 Soal</a>
+                    <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
+                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                            <button type="button" onclick='openEditModal(@json($s))' style="background: #fafafa; border: 1px solid #cbd5e1; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: #475569;" title="Edit Jadwal">✏️</button>
+                            <a href="{{ route('admin.questions.index', $s->id) }}" style="text-decoration: none; background: #1e293b; color: white; padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;">📝 Soal</a>
                             <form action="{{ route('admin.schedules.destroy', $s->id) }}" method="POST" style="display:inline;">
                                 @csrf @method('DELETE')
-                                <button type="submit" onclick="return confirm('Hapus jadwal ini? Seluruh soal dan nilai siswa akan hilang!')" style="background: #fee2e2; border: 1px solid #fecaca; padding: 8px; border-radius: 6px; cursor: pointer;">🗑️</button>
+                                <button type="submit" onclick="return confirm('Hapus jadwal ini? Seluruh soal dan nilai siswa akan hilang!')" style="background: rgba(231, 76, 60, 0.08); border: 1px solid rgba(231, 76, 60, 0.2); padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;">🗑️</button>
                             </form>
                         </div>
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="6" style="text-align: center; padding: 40px; color: #64748b;">Belum ada jadwal.</td></tr>
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 50px 20px; color: #6a6a7a; font-weight: 600; font-size: 14px;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">📋</div>
+                        Belum ada jadwal pelaksanaan ujian yang terdaftar.
+                    </td>
+                </tr>
                 @endforelse
             </tbody>
         </table>
@@ -132,18 +207,14 @@
     function closeScheduleModal() { document.getElementById('scheduleModal').style.display = 'none'; }
     function closeEditModal() { document.getElementById('editScheduleModal').style.display = 'none'; }
 
-    // Fungsi Utama AJAX Load Guru
     function loadTeachers(subjectId, targetSelectId, selectedIds = []) {
         const teacherSelect = document.getElementById(targetSelectId);
         if(!teacherSelect) return;
-
         teacherSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat guru...</option>';
-        
         if(!subjectId) {
             teacherSelect.innerHTML = '<option value="" disabled>Pilih Mapel Dulu</option>';
             return;
         }
-
         fetch(`/admin/get-teachers/${subjectId}?t=${new Date().getTime()}`)
             .then(res => res.json())
             .then(data => {
@@ -155,7 +226,6 @@
                         let opt = document.createElement('option');
                         opt.value = g.id;
                         opt.text = g.name;
-                        // Cek jika ID guru ini ada dalam daftar yang dipilih (untuk Edit)
                         if (Array.isArray(selectedIds) && selectedIds.map(String).includes(String(g.id))) {
                             opt.selected = true;
                         }
@@ -173,20 +243,15 @@
         const modal = document.getElementById('editScheduleModal');
         const form = document.getElementById('editScheduleForm');
         form.action = "/admin/schedules/" + schedule.id;
-        
         document.getElementById('edit_exam_type_id').value = schedule.exam_type_id;
         document.getElementById('edit_subject_id').value = schedule.subject_id;
         document.getElementById('edit_classroom_id').value = schedule.classroom_id;
         document.getElementById('edit_proctor_id').value = schedule.proctor_id;
         document.getElementById('edit_tanggal_ujian').value = schedule.tanggal_ujian;
         document.getElementById('edit_durasi').value = schedule.durasi;
-
-        // Load guru pengampu untuk mapel terkait dan tandai yang sudah dipilih
         let currentTeachers = schedule.teacher_ids;
         if(typeof currentTeachers === 'string') currentTeachers = JSON.parse(currentTeachers);
-        
         loadTeachers(schedule.subject_id, 'edit_teacher_ids', currentTeachers);
-        
         modal.style.display = 'block';
     }
 </script>
