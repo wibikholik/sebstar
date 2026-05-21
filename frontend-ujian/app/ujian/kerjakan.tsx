@@ -18,7 +18,7 @@ import {
   AppState, 
   BackHandler 
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'; // Modifikasi: Import useNavigation untuk deteksi blur fokus
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import api from '../../src/api/axiosConfig';
 import { Ionicons } from '@expo/vector-icons';
 import * as ScreenCapture from 'expo-screen-capture';
@@ -30,7 +30,7 @@ const { width } = Dimensions.get('window');
 export default function KerjakanScreen() {
   const { id, token } = useLocalSearchParams();
   const router = useRouter();
-  const navigation = useNavigation(); // Mengaktifkan pengontrol fokus navigasi layar
+  const navigation = useNavigation();
   
   // STATE SOAL & JAWABAN
   const [soal, setSoal] = useState([]);
@@ -44,10 +44,11 @@ export default function KerjakanScreen() {
   // STATE KEAMANAN & TIMER
   const [timeLeft, setTimeLeft] = useState(0);
   const soundRef = useRef(null); 
+  const soundIntervalRef = useRef(null); // Reference untuk mengontrol batas putaran suara
   const appState = useRef(AppState.currentState);
   const timerRef = useRef(null);
   const pusherRef = useRef(null);
-  const violationTriggered = useRef(false); // Flag pengunci agar request pelanggaran tidak menembak berkali-kali (anti-spam data)
+  const violationTriggered = useRef(false);
 
   // ANIMASI SIDE NAV
   const [sideNavVisible, setSideNavVisible] = useState(false);
@@ -63,28 +64,66 @@ export default function KerjakanScreen() {
     return matches ? matches[1] : 'localhost';
   };
 
-  // --- 1. FUNGSI ALARM PERINGATAN KELUAR APPLICATION ---
+  // --- 1. FUNGSI ALARM PERINGATAN (DIBATASI MAKSIMAL 2 KALI PUTARAN) ---
   async function playWarningSound() {
     try {
+      // Bersihkan sisa objek audio lama jika masih menggantung
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
+        soundRef.current = null;
       }
-      const { sound: newSound } = await Audio.Sound.createAsync(
-         require('../../assets/sounds/alert.mp3'),
-         { shouldPlay: true, isLooping: true, volume: 1.0 }
-      );
-      soundRef.current = newSound;
+      if (soundIntervalRef.current) {
+        clearInterval(soundIntervalRef.current);
+      }
+
+      let playCount = 0;
+
+      const triggerAudioPlay = async () => {
+        if (playCount >= 2) {
+          // Jika sudah berbunyi 2 kali, matikan interval otomatis
+          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+          await stopWarningSound();
+          return;
+        }
+
+        try {
+          const { sound: newSound } = await Audio.Sound.createAsync(
+             require('../../assets/sounds/alert.mp3'),
+             { shouldPlay: true, isLooping: false, volume: 1.0 }
+          );
+          soundRef.current = newSound;
+          playCount++;
+          console.log(`🔊 Alarm berbunyi ke-${playCount} kali.`);
+        } catch (err) {
+          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+          console.log("Gagal memicu play audio internal:", err);
+        }
+      };
+
+      // Jalankan bunyi pertama langsung
+      await triggerAudioPlay();
+
+      // Jalankan bunyi kedua dengan jeda waktu 2.5 detik (sesuai rata-rata durasi file mp3 alert)
+      soundIntervalRef.current = setInterval(async () => {
+        await triggerAudioPlay();
+      }, 2500);
+
     } catch (e) {
       console.log("Gagal memutar suara alarm background:", e);
     }
   }
 
   async function stopWarningSound() {
+    if (soundIntervalRef.current) {
+      clearInterval(soundIntervalRef.current);
+      soundIntervalRef.current = null;
+    }
     if (soundRef.current) {
       try {
         await soundRef.current.stopAsync();
         await soundRef.current.unloadAsync();
         soundRef.current = null;
+        console.log("🔇 Alarm berhasil dihentikan total.");
       } catch (e) {
         console.log("Gagal mematikan suara alarm:", e);
       }
@@ -93,21 +132,20 @@ export default function KerjakanScreen() {
 
   // --- 2. LOGIKA UTAMA EKSEKUSI HUKUMAN DISKUALIFIKASI ---
   const eksekusiDiskualifikasi = async (alasan) => {
-    // Jika flag pengaman sudah true, hentikan proses biar tidak tabrakan
     if (violationTriggered.current || isSubmitted) return;
     violationTriggered.current = true;
 
-    console.log(`🛑 Tindakan Kecurangan Terditeksi: ${alasan}`);
+    console.log(`🛑 Tindakan Kecurangan Terdeteksi: ${alasan}`);
     
-    // Mainkan sirine alarm lokal kencang-kencang
-    playWarningSound();
+    // Mainkan alarm terkunci (maksimal 2 kali putar)
+    await playWarningSound();
 
-    // Kirim bukti kecurangan ke server pengawas secara live
     try {
       await api.post(`/ujian/${id}/log-pelanggaran`, { 
         type: 'KELUAR_APLIKASI',
         details: `Siswa melanggar mode ketat: ${alasan}`
       });
+      if (timerRef.current) clearInterval(timerRef.current);
       console.log("Log pelanggaran sukses dilaporkan ke database.");
     } catch (e) { 
       console.log("Gagal kirim log pelanggaran ke backend:", e.message); 
@@ -143,7 +181,7 @@ export default function KerjakanScreen() {
       if (parseInt(data.studentId) === parseInt(studentId)) {
         if (data.actionType === 'RESET_AKSES') {
           await stopWarningSound();
-          violationTriggered.current = false; // Buka kembali kunci flag pelanggaran
+          violationTriggered.current = false; 
           if (timerRef.current) clearInterval(timerRef.current);
           
           Alert.alert(
@@ -174,7 +212,7 @@ export default function KerjakanScreen() {
     };
   }, [id, studentId]);
 
-  // --- 4. ENGINE KEAMANAN BARU (LAPIS BAJA MULTI-DETEKSI) ---
+  // --- 4. ENGINE KEAMANAN (LAPIS BAJA MULTI-DETEKSI) ---
   useEffect(() => {
     fetchData();
 
@@ -182,21 +220,20 @@ export default function KerjakanScreen() {
       ScreenCapture.preventScreenCaptureAsync().catch(() => {});
     }
 
-    // 🛡️ LAPIS 1: Deteksi via Siklus Hidup OS (AppState)
     const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
-      // Menangkap status 'background' (klik Home) atau status 'inactive' (tarik status bar / buka menu split view)
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
         eksekusiDiskualifikasi("Membuka laci notifikasi atas, menekan Recent Apps, atau mencoba membelah layar (Split Screen).");
       }
       appState.current = nextAppState;
     });
 
-    // 🛡️ LAPIS 2: Deteksi via Hilangnya Fokus Navigasi (Anti-Split Screen Jari Menyentuh Aplikasi Sebelah)
-    const blurSubscription = navigation.addListener('blur', () => {
-      eksekusiDiskualifikasi("Kehilangan fokus layar pengerjaan utama (mencoba interaksi dengan aplikasi melayang/jendela disamping).");
+    const blurSubscription = navigation.addListener('blur', async () => {
+      // Pastikan saat pindah karena disubmit normal, suara tidak dituduh curang
+      if (!isSubmitted) {
+        eksekusiDiskualifikasi("Kehilangan fokus layar pengerjaan utama.");
+      }
     });
 
-    // Mengunci tombol hardware back bawaan HP Android
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
 
     return () => {
@@ -207,11 +244,14 @@ export default function KerjakanScreen() {
       if (Platform.OS !== 'web') {
         ScreenCapture.allowScreenCaptureAsync().catch(() => {});
       }
+      
+      // Paksa matikan semua jenis interval bunyi saat siklus komponen hancur/pindah halaman
+      if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
       if (soundRef.current) {
-        soundRef.current.unloadAsync();
+        soundRef.current.unloadAsync().catch(() => {});
       }
     };
-  }, [id]);
+  }, [id, isSubmitted]);
 
   // --- 5. HTTP REQUEST AMBIL DATA SOAL & USER PROFILE ---
   const fetchData = async () => {
@@ -237,7 +277,7 @@ export default function KerjakanScreen() {
       } else {
         Alert.alert("Akses Ditolak", errorMsg, [{ text: "Kembali", onPress: () => router.replace('/(tabs)') }]);
       }
-    } finally { 
+    } finally {
       setLoading(false); 
     }
   };
@@ -280,6 +320,8 @@ export default function KerjakanScreen() {
 
   const confirmFinish = async (isAuto = false) => {
     setModalVisible(false);
+    // Hentikan alarm sesegera mungkin saat mengumpulkan lembar jawaban resmi
+    await stopWarningSound();
     try {
       await api.post(`/ujian/${id}/finish`, {}, { headers: { 'X-Exam-Token': token } });
       setIsSubmitted(true);
@@ -310,7 +352,6 @@ export default function KerjakanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 🛡️ LAPIS 3: Agresif menyembunyikan status bar agar area penarikan notifikasi terkunci/hilang */}
       <StatusBar hidden={true} />
       
       {/* HEADER BAR */}

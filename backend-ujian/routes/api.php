@@ -39,5 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Hasil Ujian
     Route::get('/ujian/{id}/hasil', [ExamController::class, 'getResult']);
     Route::post('/ujian/{id}/log-pelanggaran', [ExamController::class, 'logPelanggaran']);
+
+    //profile
+    Route::post('/update-profile', [App\Http\Controllers\Api\ProfileController::class, 'updateProfile']);
+
     
 });
