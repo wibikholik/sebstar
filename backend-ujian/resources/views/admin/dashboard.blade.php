@@ -34,6 +34,7 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         position: relative !important;
         overflow: hidden !important;
+        text-decoration: none !important;
     }
 
     .stat-card:hover {
@@ -106,10 +107,10 @@
         color: #cd0000 !important;
     }
 
-    /* Grid Sistem Informasi Mini */
+    /* Grid Sistem Informasi Mini (Diatur Menjadi 2 Kolom Proporsional) */
     .mini-stats-grid {
         display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
+        grid-template-columns: repeat(2, 1fr) !important;
         gap: 20px !important;
     }
 
@@ -122,6 +123,7 @@
         align-items: center !important;
         justify-content: space-between !important;
         transition: all 0.3s ease !important;
+        text-decoration: none !important;
     }
 
     .mini-card-info p {
@@ -143,16 +145,6 @@
         font-size: 26px !important;
         color: #a0a0b0 !important;
         transition: all 0.3s ease !important;
-    }
-
-    /* Highlight Merah Khusus Ujian Hari Ini */
-    .mini-card.highlight {
-        border-left: 4px solid #cd0000 !important;
-        background: rgba(230, 57, 70, 0.02) !important;
-    }
-
-    .mini-card.highlight .mini-card-icon {
-        color: rgba(205, 0, 0, 0.4) !important;
     }
 
     .mini-card:hover {
@@ -205,12 +197,14 @@
         gap: 8px !important;
         box-shadow: 0 5px 15px rgba(205, 0, 0, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        text-decoration: none !important;
     }
 
     .btn-action-premium:hover {
         transform: translateY(-3px) !important;
         box-shadow: 0 8px 22px rgba(205, 0, 0, 0.4) !important;
         filter: brightness(1.1) !important;
+        color: #ffffff !important;
     }
 
     .btn-action-premium i {
@@ -224,89 +218,86 @@
 </style>
 
 @section('content')
+    <!-- CARD BOX STATISTIK UTAMA - TERHUBUNG KE URL FILTER QUERY ROLE -->
     <div class="stats-grid">
-        <div class="stat-card">
+        <a href="{{ route('admin.users.index', ['role' => 'siswa']) }}" class="stat-card">
             <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
             <div class="stat-info">
                 <h2>{{ $jml_siswa }}</h2>
                 <p>TOTAL SISWA</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.users.index', ['role' => 'guru']) }}" class="stat-card">
             <div class="stat-icon-wrapper icon-guru"><i class="fas fa-chalkboard-teacher"></i></div>
             <div class="stat-info">
                 <h2>{{ $jml_guru }}</h2>
                 <p>TOTAL GURU</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.users.index', ['role' => 'pengawas']) }}" class="stat-card">
             <div class="stat-icon-wrapper icon-pengawas"><i class="fas fa-user-lock"></i></div>
             <div class="stat-info">
                 <h2>{{ $jml_pengawas }}</h2>
                 <p>TOTAL PENGAWAS</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.schedules.index') }}" class="stat-card">
             <div class="stat-icon-wrapper icon-jadwal"><i class="fas fa-calendar-check"></i></div>
             <div class="stat-info">
                 <h2>{{ $jml_schedule }}</h2>
                 <p>TOTAL JADWAL UJIAN</p>
             </div>
-        </div>
+        </a>
     </div>
 
+    <!-- BOX STATISTIK DATA MASTER MINI -->
     <div class="content-box">
         <div class="box-header">
             <h3><i class="fas fa-chart-pie header-icon"></i> Statistik Sistem</h3>
         </div>
         <div class="mini-stats-grid">
-            <div class="mini-card">
+            <a href="{{ route('admin.subjects.index') }}" class="mini-card">
                 <div class="mini-card-info">
                     <p>Total Mata Pelajaran</p>
                     <h2>{{ $jml_mata_pelajaran }}</h2>
                 </div>
                 <i class="fas fa-book-open mini-card-icon"></i>
-            </div>
+            </a>
             
-            <div class="mini-card">
+            <a href="{{ route('admin.classrooms.index') }}" class="mini-card">
                 <div class="mini-card-info">
                     <p>Total Kelas</p>
                     <h2>{{ $jml_kelas }}</h2>
                 </div>
                 <i class="fas fa-school mini-card-icon"></i>
-            </div>
-            
-            <div class="mini-card highlight">
-                <div class="mini-card-info">
-                    <p>Ujian Hari Ini</p>
-                    <h2>{{ $jml_ujian_hari_ini }}</h2>
-                </div>
-                <i class="fas fa-laptop-code mini-card-icon"></i>
-            </div>
+            </a>
         </div>
     </div>
 
+    <!-- BOX AREA VISUALISASI GRAFIK REAL-TIME -->
     <div class="content-box">
         <div class="box-header">
             <h3><i class="fas fa-chart-line header-icon"></i> Grafik Monitoring Aktivitas</h3>
         </div>
         <div class="charts-grid">
             
+            <!-- GRAFIK BATANG DATA JURUSAN / KELAS -->
             <div class="chart-container-box">
                 <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
-                    <i class="fas fa-graduation-cap" style="color: #cd0000; margin-right: 5px;"></i> Distribusi Data Siswa (Sampel Jurusan)
+                    <i class="fas fa-graduation-cap" style="color: #cd0000; margin-right: 5px;"></i> Distribusi Data Siswa (Per Jurusan/Kelas)
                 </h4>
                 <div class="chart-wrapper">
                     <canvas id="chartSiswa"></canvas>
                 </div>
-                <button class="btn-action-premium">
+                <a href="{{ route('admin.schedules.index') }}" class="btn-action-premium">
                     <i class="fas fa-folder-plus"></i> Kelola Data Soal
-                </button>
+                </a>
             </div>
 
+            <!-- GRAFIK LINE TREN JADWAL MINGGUAN -->
             <div class="chart-container-box">
                 <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
                     <i class="fas fa-history" style="color: #cd0000; margin-right: 5px;"></i> Aktivitas Sesi Ujian Seminggu Terakhir
@@ -314,30 +305,36 @@
                 <div class="chart-wrapper">
                     <canvas id="chartKeaktifan"></canvas>
                 </div>
-                <button class="btn-action-premium">
+                <a href="{{ route('admin.schedules.index') }}" class="btn-action-premium">
                     <i class="fas fa-sliders-h"></i> Atur Sesi Ujian
-                </button>
+                </a>
             </div>
 
         </div>
     </div>
 
+    <!-- SCRIPT INJEKSI CHART JS AMAN & DINAMIS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             Chart.defaults.maintainAspectRatio = false;
 
-            // Chart 1: Bar Chart Data Siswa per Jurusan
+            // Injeksi Data JSON Murni dari Controller (Bebas dari Bug Kurung Siku)
+            const kelasLabels = @json($kelasLabels);
+            const kelasData = @json($kelasData);
+            const trenUjianData = @json($trenUjianData);
+
+            // Chart 1: Bar Chart Data Siswa per Jurusan/Kelas otomatis database
             new Chart(document.getElementById('chartSiswa'), {
                 type: 'bar',
                 data: {
-                    labels: ['RPL', 'TKJ', 'AKL', 'TKR'],
+                    labels: kelasLabels,
                     datasets: [{ 
                         label: 'Jumlah Siswa', 
-                        data: [{{ $jml_siswa }}, 120, 95, 140], 
-                        backgroundColor: '#cd0000',
+                        data: kelasData, 
+                        backgroundColor: '#1e90ff',
                         borderRadius: 6,
-                        barThickness: 30
+                        barThickness: 25
                     }]
                 },
                 options: { 
@@ -350,14 +347,14 @@
                 }
             });
 
-            // Chart 2: Line Chart Sesi Ujian Mingguan
+            // Chart 2: Line Chart Sesi Ujian Seminggu Terakhir otomatis database
             new Chart(document.getElementById('chartKeaktifan'), {
                 type: 'line',
                 data: {
-                    labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum'],
+                    labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
                     datasets: [{ 
-                        label: 'Sesi Selesai', 
-                        data: [12, 25, 18, {{ $jml_ujian_hari_ini * 5 ?: 30 }}, 15], 
+                        label: 'Jumlah Jadwal', 
+                        data: trenUjianData, 
                         borderColor: '#cd0000', 
                         borderWidth: 3,
                         backgroundColor: 'rgba(205, 0, 0, 0.05)',

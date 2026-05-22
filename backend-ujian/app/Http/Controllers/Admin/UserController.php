@@ -18,6 +18,7 @@ class UserController extends Controller
     {
         $query = User::with(['subject', 'classroom']);
 
+        // Filter dinamis dari klik Dashboard Admin (?role=guru)
         if ($request->has('role') && $request->role != '') {
             $query->where('role', $request->role);
         }
@@ -36,17 +37,27 @@ class UserController extends Controller
     {
         $request->validate([
             'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email',
-            'password'     => 'required|min:5',
-            'role'         => 'required|in:admin,guru,pengawas,siswa', // Tambah pengawas
-            'nis'          => 'required_if:role,siswa|nullable|unique:users,nis',
-            'nip'          => 'required_if:role,guru|nullable|unique:users,nip',
+            'email'        => 'required|email|max:255|unique:users,email',
+            'password'     => 'required|min:6',
+            'role'         => 'required|in:admin,guru,pengawas,siswa',
+            'nis'          => 'required_if:role,siswa|nullable|string|max:50|unique:users,nis',
+            'nip'          => 'required_if:role,guru|nullable|string|max:50|unique:users,nip',
             'classroom_id' => 'required_if:role,siswa|nullable|exists:classrooms,id',
             'subject_id'   => 'required_if:role,guru|nullable|exists:subjects,id',
         ], [
-            'email.unique' => 'Email ini sudah terdaftar!',
-            'nis.unique'   => 'NIS ini sudah digunakan oleh siswa lain!',
-            'nip.unique'   => 'NIP ini sudah digunakan oleh guru lain!',
+            'name.required'            => 'Nama lengkap wajib diisi!',
+            'email.required'           => 'Alamat email wajib diisi!',
+            'email.email'              => 'Format alamat email tidak valid!',
+            'email.unique'             => 'Alamat email ini sudah terdaftar di sistem!',
+            'password.required'        => 'Password wajib ditentukan!',
+            'password.min'             => 'Password minimal harus berisi 6 karakter!',
+            'role.required'            => 'Silakan pilih salah satu role pengguna!',
+            'nis.required_if'          => 'Nomor Induk Siswa (NIS) wajib diisi jika memilih role Siswa!',
+            'nis.unique'               => 'NIS ini sudah digunakan oleh siswa lain!',
+            'nip.required_if'          => 'Nomor Induk Pegawai (NIP) wajib diisi jika memilih role Guru!',
+            'nip.unique'               => 'NIP ini sudah digunakan oleh guru lain!',
+            'classroom_id.required_if' => 'Kelas wajib ditentukan untuk pengguna role Siswa!',
+            'subject_id.required_if'   => 'Mata pelajaran diampu wajib ditentukan untuk pengguna role Guru!',
         ]);
 
         try {
@@ -57,7 +68,6 @@ class UserController extends Controller
                 'role'     => $request->role,
             ];
 
-            // Logika Kolom Spesifik: Selain role terkait, set NULL
             $data['nis']          = ($request->role === 'siswa') ? $request->nis : null;
             $data['classroom_id'] = ($request->role === 'siswa') ? $request->classroom_id : null;
             $data['nip']          = ($request->role === 'guru') ? $request->nip : null;
@@ -79,14 +89,29 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
+        // VALIDASI PASSING PASSWORD EDIT (Wajib min 6 jika diisi oleh admin)
         $request->validate([
             'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email,' . $id,
+            'email'        => 'required|email|max:255|unique:users,email,' . $id,
+            'password'     => 'nullable|string|min:6', // Terkunci aman minimal 6 karakter
             'role'         => 'required|in:admin,guru,pengawas,siswa',
-            'nis'          => 'required_if:role,siswa|nullable|unique:users,nis,' . $id,
-            'nip'          => 'required_if:role,guru|nullable|unique:users,nip,' . $id,
+            'nis'          => 'required_if:role,siswa|nullable|string|max:50|unique:users,nis,' . $id,
+            'nip'          => 'required_if:role,guru|nullable|string|max:50|unique:users,nip,' . $id,
             'classroom_id' => 'required_if:role,siswa|nullable|exists:classrooms,id',
             'subject_id'   => 'required_if:role,guru|nullable|exists:subjects,id',
+        ], [
+            'name.required'            => 'Nama lengkap wajib diisi!',
+            'email.required'           => 'Alamat email wajib diisi!',
+            'email.email'              => 'Format alamat email tidak valid!',
+            'email.unique'             => 'Alamat email ini sudah terdaftar oleh pengguna lain!',
+            'password.min'             => 'Password baru minimal harus berisi 6 karakter!',
+            'role.required'            => 'Silakan pilih salah satu role pengguna!',
+            'nis.required_if'          => 'NIS wajib diisi jika role diubah menjadi Siswa!',
+            'nis.unique'               => 'NIS ini sudah digunakan oleh siswa lain!',
+            'nip.required_if'          => 'NIP wajib diisi jika role diubah menjadi Guru!',
+            'nip.unique'               => 'NIP ini sudah digunakan oleh guru lain!',
+            'classroom_id.required_if' => 'Kelas wajib ditentukan untuk pengguna role Siswa!',
+            'subject_id.required_if'   => 'Mata pelajaran diampu wajib ditentukan untuk pengguna role Guru!',
         ]);
 
         try {
@@ -96,12 +121,13 @@ class UserController extends Controller
                 'role'  => $request->role,
             ];
 
-            // Jika role diubah ke pengawas/admin, data nis/nip sebelumnya otomatis terhapus (NULL)
+            // Set null kolom relasi jika admin memutar balik role user saat di-edit
             $data['nis']          = ($request->role === 'siswa') ? $request->nis : null;
             $data['classroom_id'] = ($request->role === 'siswa') ? $request->classroom_id : null;
             $data['nip']          = ($request->role === 'guru') ? $request->nip : null;
             $data['subject_id']   = ($request->role === 'guru') ? $request->subject_id : null;
 
+            // Enkripsi password baru hanya jika kolom password diisi admin
             if ($request->filled('password')) {
                 $data['password'] = Hash::make($request->password);
             }
@@ -110,7 +136,11 @@ class UserController extends Controller
 
             return redirect()->route('admin.users.index')->with('success', 'Data ' . $user->name . ' berhasil diperbarui!');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Gagal Update: ' . $e->getMessage());
+            // Memberikan tanda penampung sesi khusus 'edit' agar modal otomatis terkunci terbuka pasca-reload
+            return redirect()->back()
+                ->withInput()
+                ->with('error_form_type', 'edit')
+                ->with('error', 'Gagal Update: ' . $e->getMessage());
         }
     }
 
@@ -121,7 +151,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         
-        if(auth()->id() == $user->id) {
+        if (auth()->id() == $user->id) {
             return redirect()->back()->with('error', 'Anda tidak diizinkan menghapus akun sendiri!');
         }
 

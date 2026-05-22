@@ -40,7 +40,7 @@
         display: flex !important;
         align-items: center !important;
         gap: 12px !important;
-        flex-wrap: nowrap !important; /* Mengunci elemen agar selalu ke samping */
+        flex-wrap: nowrap !important;
         flex-shrink: 0 !important;
     }
 
@@ -52,7 +52,7 @@
         border: 1px solid #edf0f5 !important;
         border-radius: 30px !important;
         padding: 4px 6px 4px 16px !important;
-        width: 280px !important; /* Dikunci agar pas berdampingan */
+        width: 280px !important;
         transition: all 0.3s ease !important;
         flex-shrink: 0 !important;
     }
@@ -201,12 +201,26 @@
     .btn-table-action.delete { background: rgba(230, 57, 70, 0.1) !important; color: #cd0000 !important; }
     .btn-table-action.delete:hover { background: #cd0000 !important; color: #ffffff !important; }
 
-    /* ================= BADGES & MISC ================= */
+    /* ================= BADGES, LIVE TOGGLE SWITCH & MISC ================= */
     .badge-type { font-size: 10px !important; background: rgba(30, 144, 255, 0.1) !important; color: #1e90ff !important; padding: 4px 10px !important; border-radius: 20px !important; font-weight: 700 !important; }
     .badge-class { background: #fafafa !important; border: 1px solid #edf0f5 !important; padding: 4px 10px !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600; color: #1e1e2f !important; }
     .badge-source-mandiri { font-size: 10px !important; color: #2ecc71 !important; border: 1px solid #2ecc71 !important; padding: 3px 8px !important; border-radius: 10px !important; font-weight: 700 !important; }
     .badge-source-pusat { font-size: 10px !important; color: #cd0000 !important; border: 1px solid #cd0000 !important; padding: 3px 8px !important; border-radius: 10px !important; font-weight: 700 !important; }
     .token-box { font-family: monospace !important; font-size: 14px !important; font-weight: 800 !important; background: #fffbeb !important; color: #b45309 !important; padding: 5px 12px !important; border-radius: 6px !important; border: 1px dashed #f59e0b !important; }
+
+    /* Custom Status Text Badge */
+    .status-text-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; display: inline-block; transition: all 0.2s; }
+    .status-text-badge.active { background: rgba(46, 204, 113, 0.1); color: #2ecc71; }
+    .status-text-badge.inactive { background: rgba(148, 163, 184, 0.1); color: #64748b; }
+
+    /* Custom HTML Switch Toggle Style */
+    .switch-toggle { position: relative; display: inline-block; width: 44px; height: 24px; margin: 0; }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .slider-toggle { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px; }
+    .slider-toggle:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider-toggle { background-color: #2ecc71; }
+    input:checked + .slider-toggle:before { transform: translateX(20px); }
+    input:disabled + .slider-toggle { background-color: #f1f5f9; cursor: not-allowed; opacity: 0.5; }
 
     /* ================= MODAL CUSTOM STANDARD ================= */
     .modal-custom { 
@@ -245,7 +259,7 @@
             <p style="margin: 5px 0 0 0; color: #6a6a7a; font-size: 14px;">Kelola ujian mandiri atau pantau jadwal ujian terpusat dari Admin.</p>
         </div>
         
-        {{-- Sisi Kanan: Search Bar + Tombol Terkunci Berdampingan (Anti Tumpuk) --}}
+        {{-- Sisi Kanan: Search Bar + Tombol --}}
         <div class="header-action-section">
             <form action="{{ url()->current() }}" method="GET" style="margin: 0; padding: 0; display: block;">
                 <div class="search-wrapper">
@@ -286,16 +300,21 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th style="width: 30%;">Tipe & Mata Pelajaran</th>
+                    <th style="width: 25%;">Tipe & Mata Pelajaran</th>
                     <th>Kelas</th>
                     <th>Waktu & Durasi</th>
                     <th style="text-align: center;">Token</th>
+                    <th style="text-align: center;">Status Ujian</th>
                     <th style="text-align: center;">Sumber</th>
                     <th style="text-align: center; width: 20%;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($schedules as $s)
+                @php
+                    // MENGUNCI/MEMBUKA LIVE TOGGLE BERDASARKAN IZIN IS_TEACHER_MANAGEABLE DARI TABEL EXAM_TYPES
+                    $isAllowedByAdmin = isset($s->examType) && (int)$s->examType->is_teacher_manageable === 1;
+                @endphp
                 <tr>
                     <td>
                         <span class="badge-type">
@@ -315,6 +334,24 @@
                     <td style="text-align: center;">
                         <span class="token-box">{{ $s->token }}</span>
                     </td>
+                    
+                    {{-- KOLOM LIVE STATUS TOGGLE SWITCH --}}
+                    <td style="text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                            <label class="switch-toggle">
+                                <input type="checkbox" 
+                                       class="status-toggle-input"
+                                       data-id="{{ $s->id }}"
+                                       {{ $s->status == 'aktif' ? 'checked' : '' }}
+                                       {{ !$isAllowedByAdmin ? 'disabled' : '' }}>
+                                <span class="slider-toggle"></span>
+                            </label>
+                            <span id="text-status-{{ $s->id }}" class="status-text-badge {{ $s->status == 'aktif' ? 'active' : 'inactive' }}">
+                                {{ strtoupper($s->status) }}
+                            </span>
+                        </div>
+                    </td>
+
                     <td style="text-align: center;">
                         @if($s->created_by == auth()->id())
                             <span class="badge-source-mandiri">MANDIRI</span>
@@ -324,12 +361,10 @@
                     </td>
                     <td style="text-align: center;">
                         <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
-                            {{-- Akses Kelola Soal --}}
                             <a href="{{ route('guru.questions.manage', $s->id) }}" class="btn-table-action manage">
                                 <i class="fas fa-edit"></i> Soal
                             </a>
                             
-                            {{-- Edit & Hapus Khusus Jadwal Mandiri --}}
                             @if($s->created_by == auth()->id())
                                 <button type="button" onclick='openEditModal(@json($s))' class="btn-table-action edit" title="Ubah Jadwal">
                                     <i class="fas fa-pen"></i>
@@ -347,7 +382,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: #6a6a7a; font-weight: 600;">
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #6a6a7a; font-weight: 600;">
                         <i class="fas fa-folder-open" style="font-size: 24px; color: #a0a0b0; display: block; margin-bottom: 10px;"></i>
                         @if(request('search'))
                             Hasil pencarian untuk "{{ request('search') }}" tidak ditemukan.
@@ -366,7 +401,7 @@
 @include('guru.schedules.modal_create')
 @include('guru.schedules.modal_edit')
 
-{{-- Script Logika Modal --}}
+{{-- Script Logika Modal & Live AJAX Request --}}
 <script>
     function openCreateModal() { 
         document.getElementById('createModal').style.display = 'block'; 
@@ -398,5 +433,54 @@
             event.target.style.display = "none";
         }
     }
+
+    // LIVE AJAX HANDLER UNTUK TOGGLE SWITCH STATUS
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggles = document.querySelectorAll('.status-toggle-input');
+        
+        toggles.forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const scheduleId = this.getAttribute('data-id');
+                const isChecked = this.checked;
+                const statusText = document.getElementById('text-status-' + scheduleId);
+                
+                // Ubah Tampilan UI Lebih Cepat (Optimistic UI)
+                if(isChecked) {
+                    statusText.textContent = 'AKTIF';
+                    statusText.className = 'status-text-badge active';
+                } else {
+                    statusText.textContent = 'NONAKTIF';
+                    statusText.className = 'status-text-badge inactive';
+                }
+
+                // Kirim data perubahan status via AJAX Fetch API
+                fetch(`{{ url('guru/schedules') }}/${scheduleId}/toggle-status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ status: isChecked ? 'aktif' : 'nonaktif' })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.status !== 'success') {
+                        alert('Gagal memperbarui status: ' + data.message);
+                        // Kembalikan ke posisi semula jika gagal di server
+                        this.checked = !isChecked;
+                        statusText.textContent = !isChecked ? 'AKTIF' : 'NONAKTIF';
+                        statusText.className = !isChecked ? 'status-text-badge active' : 'status-text-badge inactive';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Terjadi kendala koneksi ke server.');
+                    this.checked = !isChecked;
+                    statusText.textContent = !isChecked ? 'AKTIF' : 'NONAKTIF';
+                    statusText.className = !isChecked ? 'status-text-badge active' : 'status-text-badge inactive';
+                });
+            });
+        });
+    });
 </script>
 @endsection

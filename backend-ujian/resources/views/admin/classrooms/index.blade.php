@@ -128,18 +128,27 @@
 
 @section('content')
 
+{{-- Alert Notifikasi Sukses --}}
 @if(session('success'))
-    <div style="background: #d4edda; color: #155724; padding: 14px; border-radius: 10px; margin-bottom: 25px; font-size: 14px; border: 1px solid #c3e6cb; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-check-circle"></i> {{ session('success') }}
+    <div style="background: rgba(46, 204, 113, 0.1); color: #27ae60; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-size: 13px; font-weight: 600; border-left: 4px solid #2ecc71; display: flex; align-items: center; gap: 8px;">
+        ✓ {{ session('success') }}
+    </div>
+@endif
+
+{{-- Alert Notifikasi Gagal / Pelanggaran Relasi --}}
+@if(session('error'))
+    <div style="background: rgba(231, 76, 60, 0.1); color: #c0392b; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-size: 13px; font-weight: 600; border-left: 4px solid #e74c3c; display: flex; align-items: center; gap: 8px;">
+        ⚠️ {{ session('error') }}
     </div>
 @endif
 
 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 30px;">
     
+    {{-- BLOK KIRI: MANAJEMEN JURUSAN --}}
     <div>
         <div class="content-box">
             <div class="action-bar" style="margin-bottom: 15px;">
-                <h3><i class="fas fa-graduation-cap header-icon" style="color: #cd0000;"></i> Jurusan</h3>
+                <h3><i class="fas fa-graduation-cap" style="color: #cd0000;"></i> Jurusan</h3>
                 <button class="btn-add" onclick="openMajorModal()" style="padding: 6px 14px; font-size: 12px; border-radius: 15px;">
                     <i class="fas fa-plus" style="font-size: 10px;"></i> Jurusan
                 </button>
@@ -175,10 +184,11 @@
         </div>
     </div>
 
+    {{-- BLOK KANAN: MANAJEMEN DAFTAR KELAS --}}
     <div>
         <div class="content-box">
             <div class="action-bar">
-                <h3><i class="fas fa-school header-icon" style="color: #cd0000;"></i> Daftar Kelas</h3>
+                <h3><i class="fas fa-school" style="color: #cd0000;"></i> Daftar Kelas</h3>
                 <button class="btn-add" onclick="openClassModal()">
                     <i class="fas fa-plus-circle"></i> Tambah Kelas
                 </button>
@@ -228,27 +238,34 @@
     </div>
 </div>
 
+{{-- Form Hidden untuk Eksekusi Hapus Data Route --}}
 <form id="delete-major-form" method="POST" style="display:none;"> @csrf @method('DELETE') </form>
 <form id="delete-class-form" method="POST" style="display:none;"> @csrf @method('DELETE') </form>
 
+{{-- Menyertakan Komponen File Modal --}}
 @include('admin.classrooms.modal_major_create')
 @include('admin.classrooms.modal_major_edit')
 @include('admin.classrooms.modal_class_create')
 @include('admin.classrooms.modal_class_edit')
 
 <script>
-    // --- MANAJEMEN MODAL JURUSAN ---
-    function openMajorModal() { document.getElementById('modalMajor').style.display = 'block'; }
-    function closeMajorModal() { document.getElementById('modalMajor').style.display = 'none'; }
+    // --- MANAJEMEN MODAL JURUSAN (MAJOR) ---
+    function openMajorModal() { 
+        document.getElementById('modalMajor').style.display = 'block'; 
+    }
+    function closeMajorModal() { 
+        document.getElementById('modalMajor').style.display = 'none'; 
+    }
     
-    // Sinkronisasi data action dan values form modal edit jurusan
     function openMajorEditModal(major) {
         document.getElementById('editMajorForm').action = "/admin/majors/" + major.id;
         document.getElementById('edit_major_name').value = major.nama_jurusan;
         document.getElementById('edit_major_short').value = major.singkatan;
         document.getElementById('modalMajorEdit').style.display = 'block';
     }
-    function closeMajorEditModal() { document.getElementById('modalMajorEdit').style.display = 'none'; }
+    function closeMajorEditModal() { 
+        document.getElementById('modalMajorEdit').style.display = 'none'; 
+    }
 
     function confirmDeleteMajor(id) {
         if(confirm('Hapus jurusan ini? Menghapus jurusan akan berdampak pada data kelas terkait.')) {
@@ -258,18 +275,24 @@
         }
     }
 
-    // --- MANAJEMEN MODAL KELAS ---
-    function openClassModal() { document.getElementById('modalClass').style.display = 'block'; }
-    function closeClassModal() { document.getElementById('modalClass').style.display = 'none'; }
+    // --- SINKRONISASI MANAJEMEN MODAL KELAS (CLASSROOM) ---
+    // PERBAIKAN: Menyesuaikan target pemicu ID modalCreate kelas agar sinkron dengan file modal baru
+    function openClassModal() { 
+        document.getElementById('modalCreate').style.display = 'block'; 
+    }
+    function closeModal() { 
+        document.getElementById('modalCreate').style.display = 'none'; 
+    }
 
-    // Sinkronisasi data action dan values form modal edit kelas
     function openEditClassModal(item) {
         document.getElementById('editClassForm').action = "/admin/classrooms/" + item.id;
         document.getElementById('edit_class_name').value = item.nama_kelas;
         document.getElementById('edit_major_id').value = item.major_id;
         document.getElementById('modalEditClass').style.display = 'block';
     }
-    function closeEditClassModal() { document.getElementById('modalEditClass').style.display = 'none'; }
+    function closeEditClassModal() { 
+        document.getElementById('modalEditClass').style.display = 'none'; 
+    }
 
     function confirmDeleteClass(id) {
         if(confirm('Apakah Anda yakin ingin menghapus kelas ini?')) {
@@ -279,12 +302,15 @@
         }
     }
 
-    // Auto close modal jika klik di luar box modal
+    // Auto close modal jika admin tidak sengaja mengklik area abu-abu di luar box modal
     window.onclick = function(event) {
-        const modalIds = ['modalMajor', 'modalMajorEdit', 'modalClass', 'modalEditClass'];
+        // PERBAIKAN: Memetakan ulang susunan array ID pembungkus modal yang valid
+        const modalIds = ['modalMajor', 'modalMajorEdit', 'modalCreate', 'modalEditClass'];
         modalIds.forEach(id => {
             const m = document.getElementById(id);
-            if (m && event.target == m) m.style.display = 'none';
+            if (m && event.target == m) {
+                m.style.display = 'none';
+            }
         });
     }
 </script>

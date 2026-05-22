@@ -79,6 +79,7 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
     Route::post('/schedules', [App\Http\Controllers\Guru\ScheduleController::class, 'store'])->name('schedules.store');
     Route::put('/schedules/{id}', [App\Http\Controllers\Guru\ScheduleController::class, 'update'])->name('schedules.update');
     Route::delete('/schedules/{id}', [App\Http\Controllers\Guru\ScheduleController::class, 'destroy'])->name('schedules.destroy');
+    Route::post('/schedules/{id}/toggle-status', [App\Http\Controllers\Guru\ScheduleController::class, 'toggleStatus'])->name('schedules.toggle-status');
 
     // 3. Modul Manajemen Soal (Questions)
     Route::resource('questions', \App\Http\Controllers\Guru\QuestionController::class)->names('questions');

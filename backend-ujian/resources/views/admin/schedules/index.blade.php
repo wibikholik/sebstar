@@ -64,6 +64,25 @@
         border-color: #cd0000;
         box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1);
     }
+
+    /* ================= SAMAKAN TOGGLE STATUS DENGAN HALAMAN GURU ================= */
+    .status-text-badge { 
+        font-size: 11px; 
+        font-weight: 700; 
+        padding: 4px 10px; 
+        border-radius: 12px; 
+        display: inline-block; 
+        transition: all 0.2s; 
+    }
+    .status-text-badge.active { background: rgba(46, 204, 113, 0.1); color: #2ecc71; }
+    .status-text-badge.inactive { background: rgba(148, 163, 184, 0.1); color: #64748b; }
+
+    .switch-toggle { position: relative; display: inline-block; width: 44px; height: 24px; margin: 0; }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .slider-toggle { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px; }
+    .slider-toggle:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider-toggle { background-color: #2ecc71; }
+    input:checked + .slider-toggle:before { transform: translateX(20px); }
 </style>
 
 @section('content')
@@ -166,15 +185,23 @@
                     <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
                         <span style="font-family: monospace; font-size: 14px; font-weight: 700; background: #fffbeb; color: #b45309; padding: 6px 12px; border-radius: 8px; border: 1px dashed #f59e0b; letter-spacing: 0.5px;">{{ $s->token }}</span>
                     </td>
+                    
+                    {{-- KOLOM UPDATE STATUS BARU: SAMA DENGAN HALAMAN GURU (MENGGUNAKAN TOGGLE SWITCH) --}}
                     <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
-                        <form action="{{ route('admin.schedules.status', $s->id) }}" method="POST">
-                            @csrf
-                            <select name="status" onchange="this.form.submit()" style="padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid transparent; cursor: pointer; {{ $s->status == 'aktif' ? 'background: rgba(46, 204, 113, 0.15); color: #27ae60;' : 'background: rgba(231, 76, 60, 0.1); color: #c0392b;' }}">
-                                <option value="aktif" {{ $s->status == 'aktif' ? 'selected' : '' }}>AKTIF</option>
-                                <option value="nonaktif" {{ $s->status == 'nonaktif' ? 'selected' : '' }}>OFF</option>
-                            </select>
-                        </form>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: center;">
+                            <label class="switch-toggle">
+                                <input type="checkbox" 
+                                       class="status-toggle-input" 
+                                       data-id="{{ $s->id }}" 
+                                       {{ $s->status == 'aktif' ? 'checked' : '' }}>
+                                <span class="slider-toggle"></span>
+                            </label>
+                            <span id="text-status-{{ $s->id }}" class="status-text-badge {{ $s->status == 'aktif' ? 'active' : 'inactive' }}">
+                                {{ $s->status == 'aktif' ? 'AKTIF' : 'NONAKTIF' }}
+                            </span>
+                        </div>
                     </td>
+
                     <td style="padding: 18px 20px; text-align: center; vertical-align: middle;">
                         <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
                             <button type="button" onclick='openEditModal(@json($s))' style="background: #fafafa; border: 1px solid #cbd5e1; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: #475569;" title="Edit Jadwal">✏️</button>
@@ -254,5 +281,55 @@
         loadTeachers(schedule.subject_id, 'edit_teacher_ids', currentTeachers);
         modal.style.display = 'block';
     }
+
+    // ================= SCRIPT LIVE AJAX TOGGLE STATUS ADMIN =================
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusToggles = document.querySelectorAll('.status-toggle-input');
+        
+        statusToggles.forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const scheduleId = this.getAttribute('data-id');
+                const isChecked = this.checked;
+                const statusText = document.getElementById('text-status-' + scheduleId);
+                const currentStatus = isChecked ? 'aktif' : 'nonaktif';
+                
+                // Efek Cepat di UI
+                if (isChecked) {
+                    statusText.textContent = 'AKTIF';
+                    statusText.className = 'status-text-badge active';
+                } else {
+                    statusText.textContent = 'NONAKTIF';
+                    statusText.className = 'status-text-badge inactive';
+                }
+
+                // Kirim request update status via AJAX Fetch ke Admin Route
+                fetch(`/admin/schedules/${scheduleId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ status: currentStatus })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Jika di backend return redirect/bukan json, pastikan route controller kamu mereturn JSON response
+                    if (data.status !== 'success') {
+                        alert('Gagal mengubah status: ' + (data.message ?? 'Error terjadi.'));
+                        // Revert jika gagal
+                        toggle.checked = !isChecked;
+                        statusText.textContent = !isChecked ? 'AKTIF' : 'NONAKTIF';
+                        statusText.className = !isChecked ? 'status-text-badge active' : 'status-text-badge inactive';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Karena route bawaan kamu mungkin masih mengarah ke data web regular form redirect,
+                    // Tetap amankan reload jika server merespon redirect halaman penuh.
+                    window.location.reload();
+                });
+            });
+        });
+    });
 </script>
 @endsection

@@ -142,6 +142,7 @@
             justify-content: center;
             align-items: center;
             gap: 8px;
+            margin-bottom: 25px;
         }
 
         .btn-login:hover {
@@ -152,6 +153,27 @@
 
         .btn-login:active {
             transform: translateY(0);
+        }
+
+        /* STYLING BARU: Teks Informasi Lupa Password Terstruktur */
+        .forgot-password-footer {
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            padding-top: 15px;
+            margin-top: 5px;
+        }
+
+        .forgot-text {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 600;
+            line-height: 18px;
+            margin: 0;
+        }
+
+        .forgot-link-highlight {
+            color: #cd0000;
+            font-weight: 700;
+            text-decoration: none;
         }
     </style>
 </head>
@@ -188,6 +210,15 @@
                 Masuk Sistem <i class="fas fa-sign-in-alt"></i>
             </button>
         </form>
+
+        <!-- SEKSI INFO FOOTER UNTUK PENYELAMATAN LUPA PASSWORD MANUAL -->
+        <div class="forgot-password-footer">
+            <p class="forgot-text">
+                <i class="fas fa-info-circle" style="color: #94a3b8; margin-right: 2px;"></i> 
+                Lupa password? Pengawas/Guru silakan melapor ke <span class="forgot-link-highlight">Admin Sekolah</span>. 
+                Jika Akun Admin Utama terkunci, hubungi <span class="forgot-link-highlight">Tim Developer</span>.
+            </p>
+        </div>
     </div>
 
 </body>

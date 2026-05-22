@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\User;
 use App\Models\ExamLog; 
-use App\Models\StudentAnswer; // 🛑 Di-import untuk membersihkan lembar jawaban saat mengulang
-use App\Events\ExamMonitoringEvent; // 📢 Memastikan jabat tangan live Reverb WebSocket aktif
+use App\Models\StudentAnswer;
+use App\Events\ExamMonitoringEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,14 +15,21 @@ use Illuminate\Support\Facades\DB;
 class MonitoringController extends Controller
 {
     /**
-     * Menampilkan daftar jadwal ujian yang diawasi oleh guru ini.
+     * Menampilkan daftar jadwal ujian yang SEDANG AKTIF DIAWASI oleh guru ini.
      */
     public function index()
     {
         $userId = Auth::id();
 
+        // PERBAIKAN: Menambahkan filter di mana status jadwal murni 'aktif' atau 'nonaktif' (siaga)
+        // Jadwal yang statusnya sudah 'selesai' atau 'dihapus' otomatis ditendang (tidak ditampilkan)
         $schedules = Schedule::with(['subject', 'classroom'])
-            ->where('proctor_id', $userId)
+            ->where(function($query) use ($userId) {
+                $query->where('proctor_id', $userId)
+                      ->orWhereJsonContains('teacher_ids', (string)$userId)
+                      ->orWhereJsonContains('teacher_ids', (int)$userId);
+            })
+            ->whereIn('status', ['aktif', 'nonaktif']) // 🌟 KUNCI PERBAIKAN DI SINI!
             ->latest()
             ->get();
 
@@ -30,40 +37,53 @@ class MonitoringController extends Controller
     }
 
     /**
-     * Menampilkan halaman detail monitoring (Real-time Monitoring Siswa).
+     * Menampilkan halaman detail monitoring (Real-time Live Monitoring Siswa).
      */
     public function show($id)
     {
+        $userId = Auth::id();
+
         // 1. Ambil data jadwal beserta relasinya
         $schedule = Schedule::with(['subject', 'classroom'])->findOrFail($id);
 
-        // 2. Keamanan: Pastikan yang mengakses adalah pengawas yang ditugaskan
-        if ($schedule->proctor_id !== Auth::id()) {
-            abort(403, 'Anda tidak memiliki hak akses untuk memonitor jadwal ini.');
+        // 2. Keamanan Tingkat Tinggi: Pastikan pengakses beneran bagian dari tim pengawas/pengampu jadwal ini
+        $isProctor = $schedule->proctor_id === $userId;
+        $isTeacherInvolved = is_array($schedule->teacher_ids) && (in_array((string)$userId, $schedule->teacher_ids) || in_array((int)$userId, $schedule->teacher_ids));
+
+        if (!$isProctor && !$isTeacherInvolved) {
+            abort(403, 'Akses ditolak! Anda tidak memiliki otoritas pengawasan untuk ruang ujian ini.');
         }
 
         /**
-         * 3. Ambil daftar siswa beserta summary jawaban & jumlah pelanggaran.
+         * 3. Ambil daftar siswa beserta rekapitulasi real-time progress jawaban & pelanggaran
          */
         $students = User::where('role', 'siswa')
             ->where('classroom_id', $schedule->classroom_id)
             ->withCount([
-                // Hitung berapa soal yang sudah dijawab oleh siswa pada jadwal ini
+                // Hitung jumlah butir soal yang sudah dijawab oleh siswa pada sesi jadwal ini
                 'studentAnswers as total_dijawab' => function ($query) use ($schedule) {
                     $query->where('schedule_id', $schedule->id);
                 },
-                // 🛠️ PERBAIKAN: Masukkan tipe 'FORCE_SUBMIT' agar boks summary statistik atas ikut sinkron membaca status terkunci
+                // Hitung total log pelanggaran murni keluar dari aplikasi kuis mobile SEBSTAR
                 'examLogs as total_pelanggaran' => function ($query) use ($schedule) {
                     $query->where('schedule_id', $schedule->id)
-                          ->whereIn('type', ['keluar_aplikasi', 'KELUAR_APLIKASI', 'FORCE_SUBMIT']); 
+                          ->whereIn('type', ['keluar_aplikasi', 'KELUAR_APLIKASI']); 
                 }
             ])
             ->orderBy('name', 'asc')
             ->get();
 
-        // Ambil riwayat log pelanggaran terbaru untuk feed bawah
+        // Memeriksa status penguncian FORCE_SUBMIT siswa secara dinamis lewat koleksi logs
+        foreach ($students as $student) {
+            $student->is_force_submitted = ExamLog::where('schedule_id', $schedule->id)
+                ->where('user_id', $student->id)
+                ->where('type', 'FORCE_SUBMIT')
+                ->exists();
+        }
+
+        // Ambil 10 baris riwayat log aktivitas pelanggaran terbaru untuk pakan umpan balik (live-feed) bawah
         $recentLogs = ExamLog::with('user')
-            ->where('schedule_id', $id)
+            ->where('schedule_id', $schedule->id)
             ->latest()
             ->take(10)
             ->get();
@@ -72,103 +92,126 @@ class MonitoringController extends Controller
     }
 
     /**
-     * Fitur: Reset Login, Pelanggaran, dan JAWABAN Siswa (Mulai Ulang Penuh dari 0%)
+     * Fitur: Reset Login, Pelanggaran, dan Lembar Jawaban Siswa (Mulai Ulang Sesi 0%)
      */
     public function resetStudent(Request $request, $schedule_id, $student_id)
     {
+        $userId = Auth::id();
+        $schedule = Schedule::findOrFail($schedule_id);
         $student = User::where('id', $student_id)->where('role', 'siswa')->firstOrFail();
 
-        // Menggunakan Database Transaction agar proses pembersihan berjalan serentak dan aman
-        DB::transaction(function () use ($schedule_id, $student_id, $student) {
-            // 1. Ubah is_logged_in kembali ke 0 agar siswa bisa masuk lagi dari HP-nya
-            $student->update([
-                'is_logged_in' => 0
-            ]);
+        // Proteksi Otoritas Sesi Pengawas
+        $isProctor = $schedule->proctor_id === $userId;
+        $isTeacherInvolved = is_array($schedule->teacher_ids) && (in_array((string)$userId, $schedule->teacher_ids) || in_array((int)$userId, $schedule->teacher_ids));
 
-            // 2. Hapus log pelanggaran keluar_aplikasi & force submit agar status DISKUALIFIKASI di web guru hilang total
-            ExamLog::where('schedule_id', $schedule_id)
-                ->where('user_id', $student_id)
-                ->whereIn('type', ['keluar_aplikasi', 'KELUAR_APLIKASI', 'FORCE_SUBMIT'])
-                ->delete();
+        if (!$isProctor && !$isTeacherInvolved) {
+            return redirect()->back()->with('error', 'Aksi ditolak! Anda tidak memiliki akses moderasi pada ruang ujian ini.');
+        }
 
-            // 3. 🛑 PERBAIKAN LOGIKA UTAMA: Hapus lembar jawaban lama agar progress bar di monitor guru mundur bersih ke 0%
-            StudentAnswer::where('schedule_id', $schedule_id)
-                ->where('user_id', $student_id)
-                ->delete();
-        });
+        try {
+            DB::transaction(function () use ($schedule_id, $student_id, $student) {
+                // 1. Lepas kunci login siswa agar bisa login ulang dari perangkat mobile
+                $student->update(['is_logged_in' => 0]);
 
-        // 📢 4. BROADCAST REAL-TIME: Kirim sinyal ke HP siswa agar otomatis mematikan sirine alarm & membuka layar ujian kuis baru
-        broadcast(new ExamMonitoringEvent($schedule_id, $student_id, 'RESET_AKSES', "Akses ujian siswa {$student->name} telah di-reset penuh."))->toOthers();
+                // 2. Bersihkan seluruh rekaman kecurangan keluar aplikasi & log force submit
+                ExamLog::where('schedule_id', $schedule_id)
+                    ->where('user_id', $student_id)
+                    ->whereIn('type', ['keluar_aplikasi', 'KELUAR_APLIKASI', 'FORCE_SUBMIT'])
+                    ->delete();
 
-        return redirect()->back()->with('success', "Akses ujian siswa {$student->name} berhasil di-reset penuh. Progress pengerjaan kembali ke 0%.");
+                // 3. Bersihkan butir lembar jawaban lama agar bar persentase pengerjaan guru mundur ke 0%
+                StudentAnswer::where('schedule_id', $schedule_id)
+                    ->where('user_id', $student_id)
+                    ->delete();
+            });
+
+            // 📢 4. BROADCAST LIVE REVERB: Sinyal pemulihan akses kuis baru ke HP perangkat siswa terpilih
+            broadcast(new ExamMonitoringEvent($schedule_id, $student_id, 'RESET_AKSES', "Akses sesi pengerjaan ujian siswa {$student->name} telah dipulihkan penuh dari pusat."))->toOthers();
+
+            return redirect()->back()->with('success', "Akses pengerjaan siswa \"{$student->name}\" berhasil dibersihkan total. Progress kembali ke awal 0%.");
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memproses reset siswa: ' . $e->getMessage());
+        }
     }
 
     /**
-     * Fitur: Update Status Operasional Ujian (Force Stop / Aktifkan)
+     * Fitur: Perbarui Status Operasional Server Ujian (Aktifkan / Force Stop)
      */
     public function updateStatus(Request $request, $id)
     {
+        $userId = Auth::id();
+        
         $request->validate([
             'status' => 'required|in:aktif,nonaktif,selesai'
         ]);
 
-        $schedule = Schedule::findOrFail($id);
+        try {
+            $schedule = Schedule::findOrFail($id);
 
-        if ($schedule->proctor_id !== Auth::id()) {
-            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses mengubah status jadwal ini.');
+            $isProctor = $schedule->proctor_id === $userId;
+            $isTeacherInvolved = is_array($schedule->teacher_ids) && (in_array((string)$userId, $schedule->teacher_ids) || in_array((int)$userId, $schedule->teacher_ids));
+
+            if (!$isProctor && !$isTeacherInvolved) {
+                return redirect()->back()->with('error', 'Aksi diblokir! Anda tidak berwenang mengendalikan status server ujian ruangan ini.');
+            }
+
+            $schedule->update(['status' => $request->status]);
+
+            $statusText = match ($request->status) {
+                'aktif'    => 'DIAKTIFKAN KEMBALI',
+                'selesai'  => 'DIHENTIKAN PAKSA (FORCE STOP)',
+                default    => 'DINONAKTIFKAN',
+            };
+
+            return redirect()->back()->with('success', "Status pengerjaan server ujian berhasil diubah menjadi {$statusText}!");
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal merubah status operasional server: ' . $e->getMessage());
         }
-
-        $schedule->update([
-            'status' => $request->status
-        ]);
-
-        if ($request->status == 'aktif') {
-            $statusText = 'DIAKTIFKAN KEMBALI';
-        } elseif ($request->status == 'selesai') {
-            $statusText = 'DIHENTIKAN PAKSA (FORCE STOP)';
-        } else {
-            $statusText = 'DINONAKTIFKAN';
-        }
-
-        return redirect()->back()->with('success', "Status server ujian berhasil diubah menjadi {$statusText}.");
     }
 
     /**
-     * Fitur: Selesaikan Paksa Ujian Per-Siswa (Force Submit)
+     * Fitur: Hentikan & Selesaikan Sesi Ujian Siswa Secara Paksa (Force Submit)
      */
     public function forceSubmit($schedule_id, $student_id)
     {
+        $userId = Auth::id();
         $schedule = Schedule::findOrFail($schedule_id);
         $student = User::where('id', $student_id)->where('role', 'siswa')->firstOrFail();
 
-        if ($schedule->proctor_id !== Auth::id()) {
-            return redirect()->back()->with('error', 'Aksi ditolak. Anda bukan pengawas ruangan ini.');
+        $isProctor = $schedule->proctor_id === $userId;
+        $isTeacherInvolved = is_array($schedule->teacher_ids) && (in_array((string)$userId, $schedule->teacher_ids) || in_array((int)$userId, $schedule->teacher_ids));
+
+        if (!$isProctor && !$isTeacherInvolved) {
+            return redirect()->back()->with('error', 'Aksi ditolak! Anda bukan bagian dari tim pengawas ruangan kuis ini.');
         }
 
-        // Jalankan database transaction agar data aman terkunci
-        DB::transaction(function () use ($student, $schedule) {
-            // 1. Matikan status login siswa
-            $student->update([
-                'is_logged_in' => 0
-            ]);
+        try {
+            DB::transaction(function () use ($student, $schedule) {
+                // 1. Putuskan status login perangkat anak
+                $student->update(['is_logged_in' => 0]);
 
-            // 2. KUNCI AKSES PERMANEN: Tambahkan log bertipe FORCE_SUBMIT ke database.
-            // Digunakan agar ketika siswa mencoba iseng masuk lagi lewat HP, API getSoal() otomatis memblokirnya.
-            ExamLog::updateOrCreate(
-                [
-                    'schedule_id' => $schedule->id,
-                    'user_id' => $student->id,
-                    'type' => 'FORCE_SUBMIT'
-                ],
-                [
-                    'details' => 'Sesi ujian siswa telah dihentikan dan dikunci secara sepihak oleh Guru Pengawas.'
-                ]
-            );
-        });
+                // 2. Tanam log FORCE_SUBMIT
+                ExamLog::updateOrCreate(
+                    [
+                        'schedule_id' => $schedule->id,
+                        'user_id'     => $student->id,
+                        'type'        => 'FORCE_SUBMIT'
+                    ],
+                    [
+                        'details'     => 'Sesi pengerjaan lembar ujian siswa telah dihentikan paksa dan dikunci permanen oleh Guru Pengawas Ruangan.'
+                    ]
+                );
+            });
 
-        // 📢 3. BROADCAST REAL-TIME: Kirim sinyal paksa ke HP siswa via Reverb agar layar pengerjaan menutup otomatis saat itu juga!
-        broadcast(new ExamMonitoringEvent($schedule->id, $student->id, 'FORCE_SUBMIT', "Sesi ujian diselesaikan secara paksa oleh Pengawas."))->toOthers();
+            // 📢 3. BROADCAST LIVE VIA REVERB
+            broadcast(new ExamMonitoringEvent($schedule->id, $student->id, 'FORCE_SUBMIT', "Sesi pengerjaan kuis Anda telah diselesaikan secara paksa oleh Pengawas Ruangan."))->toOthers();
 
-        return redirect()->back()->with('success', "Ujian siswa {$student->name} berhasil diselesaikan secara paksa oleh Guru.");
+            return redirect()->back()->with('success', "Sesi ujian siswa \"{$student->name}\" berhasil dihentikan dan dikunci secara sepihak!");
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memproses tindakan force submit: ' . $e->getMessage());
+        }
     }
 }
