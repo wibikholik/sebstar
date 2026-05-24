@@ -1,51 +1,50 @@
-<form action="{{ route('guru.questions.store') }}" method="POST" enctype="multipart/form-data">
+{{-- Form Pembuatan Soal Premium SEBSTAR --}}
+<form action="{{ route('guru.questions.store') }}" method="POST" enctype="multipart/form-data" class="form-question-premium">
     @csrf
     {{-- Hidden Input untuk relasi --}}
     <input type="hidden" name="subject_id" value="{{ $schedule->subject_id }}">
     <input type="hidden" name="schedule_id" value="{{ $schedule->id }}">
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+    <div class="form-grid-two">
         {{-- Tipe Soal --}}
-        <div>
-            <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 13px; color: #475569;">Tipe Soal</label>
-            <select name="type" id="add_type" onchange="handleTypeChange('add')" 
-                style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; background: #fff;">
+        <div class="form-group-premium">
+            <label class="form-label-premium">Tipe Soal</label>
+            <select name="type" id="add_type" onchange="handleTypeChange('add')" class="form-select-premium">
                 <option value="pg">Pilihan Ganda (PG)</option>
                 <option value="essay">Essay / Uraian</option>
             </select>
         </div>
 
         {{-- Upload Gambar (Tambahan) --}}
-        <div>
-            <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 13px; color: #475569;">Gambar (Opsional)</label>
-            <input type="file" name="question_image" accept="image/*" 
-                style="width: 100%; font-size: 12px; color: #64748b;">
+        <div class="form-group-premium">
+            <label class="form-label-premium">Gambar (Opsional)</label>
+            <div class="file-input-wrapper">
+                <input type="file" name="question_image" accept="image/*" class="form-file-premium">
+            </div>
         </div>
     </div>
 
     {{-- Pertanyaan --}}
-    <div style="margin-bottom: 15px;">
-        <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 13px; color: #475569;">Pertanyaan</label>
-        <textarea name="question_text" placeholder="Tuliskan pertanyaan di sini..." required 
-            style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-family: inherit; resize: vertical;"></textarea>
+    <div class="form-group-premium">
+        <label class="form-label-premium">Pertanyaan</label>
+        <textarea name="question_text" placeholder="Tuliskan pertanyaan di sini..." required class="form-textarea-premium"></textarea>
     </div>
 
     {{-- Kontainer Pilihan Ganda --}}
-    <div id="addPgContainer" style="background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
-        <label style="display: block; font-weight: 700; margin-bottom: 10px; font-size: 13px; color: #1e293b;">Opsi Jawaban & Kunci</label>
-        <div style="display: grid; gap: 10px; margin-bottom: 15px;">
+    <div id="addPgContainer" class="pg-options-container">
+        <label class="container-title-premium">Opsi Jawaban & Kunci</label>
+        <div class="options-grid-premium">
             @foreach(['a','b','c','d','e'] as $opt)
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-weight: 800; color: #c91313; width: 20px;">{{ strtoupper($opt) }}.</span>
-                <input type="text" name="option_{{ $opt }}" placeholder="Isi jawaban opsi {{ strtoupper($opt) }}" 
-                    style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none;">
+            <div class="option-row-premium">
+                <span class="option-letter-premium">{{ strtoupper($opt) }}.</span>
+                <input type="text" name="option_{{ $opt }}" id="add_option_{{ $opt }}" placeholder="Isi jawaban opsi {{ strtoupper($opt) }}" required class="form-input-premium">
             </div>
             @endforeach
         </div>
         
-        <div style="border-top: 1px dashed #cbd5e1; pt-15; margin-top: 15px; padding-top: 10px;">
-            <label style="display: block; font-weight: 700; margin-bottom: 5px; font-size: 13px; color: #c91313;">Pilih Kunci Jawaban Benar</label>
-            <select name="correct_answer_pg" style="width: 100%; padding: 10px; border: 2px solid #c91313; border-radius: 8px; font-weight: 700; color: #c91313; background: #fff;">
+        <div class="correct-answer-divider">
+            <label class="form-label-premium color-accent">Pilih Kunci Jawaban Benar</label>
+            <select name="correct_answer_pg" id="add_correct_answer_pg" class="form-select-premium border-accent">
                 @foreach(['A','B','C','D','E'] as $k) 
                     <option value="{{ $k }}">KUNCI JAWABAN: {{ $k }}</option> 
                 @endforeach
@@ -54,13 +53,224 @@
     </div>
 
     {{-- Kontainer Essay --}}
-    <div id="addEssayContainer" style="display: none; background: #fdf2f2; padding: 15px; border-radius: 10px; border: 1px solid #fecaca; margin-bottom: 15px;">
-        <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 13px; color: #b91c1c;">Pedoman / Kunci Jawaban Essay</label>
-        <textarea name="correct_answer_essay" placeholder="Masukkan ringkasan jawaban benar atau kriteria penilaian..." 
-            style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #fca5a5; border-radius: 8px; outline: none; font-family: inherit;"></textarea>
+    <div id="addEssayContainer" class="essay-options-container" style="display: none;">
+        <label class="container-title-premium color-accent">Pedoman / Kunci Jawaban Essay</label>
+        <textarea name="correct_answer_essay" id="add_correct_answer_essay" placeholder="Masukkan ringkasan jawaban benar atau kriteria penilaian..." class="form-textarea-premium border-danger"></textarea>
     </div>
 
-    <button type="submit" style="width: 100%; padding: 14px; background: #c91313; color: #fff; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px -1px rgba(201, 19, 19, 0.3); transition: 0.2s;">
-        💾 Simpan Soal
+    <button type="submit" class="btn-submit-question">
+        <i class="fas fa-save"></i> Simpan Soal
     </button>
 </form>
+
+<script>
+    /**
+     * Mengatur visibilitas kontainer input berdasarkan tipe soal yang dipilih
+     */
+    function handleTypeChange(prefix) {
+        const typeSelect = document.getElementById(`${prefix}_type`);
+        const pgContainer = document.getElementById(`${prefix}_PgContainer`);
+        const essayContainer = document.getElementById(`${prefix}_EssayContainer`);
+        
+        // Elemen Input di dalam masing-masing kontainer
+        const essayTextarea = document.getElementById(`${prefix}_correct_answer_essay`);
+        const pgSelect = document.getElementById(`${prefix}_correct_answer_pg`);
+        const pgOptions = ['a', 'b', 'c', 'd', 'e'];
+
+        if (typeSelect.value === 'pg') {
+            // Tampilkan PG, Sembunyikan Essay
+            pgContainer.style.display = 'block';
+            essayContainer.style.display = 'none';
+            
+            // Atur status required agar validasi HTML5 akurat
+            essayTextarea.removeAttribute('required');
+            pgSelect.setAttribute('required', 'required');
+            pgOptions.forEach(opt => {
+                const input = document.getElementById(`${prefix}_option_${opt}`);
+                if(input) input.setAttribute('required', 'required');
+            });
+        } else {
+            // Tampilkan Essay, Sembunyikan PG
+            pgContainer.style.display = 'none';
+            essayContainer.style.display = 'block';
+            
+            // Atur status required agar validasi HTML5 akurat
+            essayTextarea.setAttribute('required', 'required');
+            pgSelect.removeAttribute('required');
+            pgOptions.forEach(opt => {
+                const input = document.getElementById(`${prefix}_option_${opt}`);
+                if(input) input.removeAttribute('required');
+            });
+        }
+    }
+
+    // Jalankan inisialisasi awal saat halaman pertama kali dimuat
+    document.addEventListener('DOMContentLoaded', function() {
+        handleTypeChange('add');
+    });
+</script>
+
+<style>
+    /* Dasar Form */
+    .form-question-premium {
+        background: #ffffff;
+    }
+
+    .form-grid-two {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 16px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .form-group-premium {
+        margin-bottom: 16px !important;
+    }
+
+    .form-label-premium {
+        display: block !important;
+        margin-bottom: 8px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #475569 !important;
+    }
+
+    .form-label-premium.color-accent {
+        color: #cd0000 !important;
+    }
+
+    /* Elemen Input Standar SEBSTAR */
+    .form-select-premium,
+    .form-input-premium,
+    .form-textarea-premium {
+        width: 100% !important;
+        padding: 11px 14px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 10px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #1e1e2f !important;
+        background: #ffffff !important;
+        outline: none !important;
+        transition: all 0.2s ease !important;
+        box-sizing: border-box !important;
+    }
+
+    .form-textarea-premium {
+        min-height: 100px !important;
+        font-family: inherit !important;
+        resize: vertical !important;
+    }
+
+    .form-select-premium:focus,
+    .form-input-premium:focus,
+    .form-textarea-premium:focus {
+        border-color: #cd0000 !important;
+        box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1) !important;
+    }
+
+    /* Kustomisasi Khusus File Input */
+    .file-input-wrapper {
+        padding: 6px 0 !important;
+    }
+
+    .form-file-premium {
+        width: 100% !important;
+        font-size: 13px !important;
+        color: #64748b !important;
+        font-weight: 600 !important;
+    }
+
+    /* Kotak Opsi Pilihan Ganda (Slate Premium) */
+    .pg-options-container {
+        background: #f8fafc !important;
+        padding: 18px !important;
+        border-radius: 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        margin-bottom: 18px !important;
+    }
+
+    .container-title-premium {
+        display: block !important;
+        font-weight: 800 !important;
+        margin-bottom: 12px !important;
+        font-size: 13px !important;
+        color: #1e293b !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .options-grid-premium {
+        display: grid !important;
+        gap: 12px !important;
+    }
+
+    .option-row-premium {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+
+    .option-letter-premium {
+        font-weight: 800 !important;
+        color: #cd0000 !important;
+        width: 24px !important;
+        font-size: 14px !important;
+    }
+
+    .correct-answer-divider {
+        border-top: 1px dashed #cbd5e1 !important;
+        margin-top: 16px !important;
+        padding-top: 14px !important;
+    }
+
+    .form-select-premium.border-accent {
+        border: 2px solid #cd0000 !important;
+        color: #cd0000 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Kotak Opsi Essay (Soft Red Premium) */
+    .essay-options-container {
+        background: #fff5f5 !important;
+        padding: 18px !important;
+        border-radius: 12px !important;
+        border: 1px solid #fee2e2 !important;
+        margin-bottom: 18px !important;
+    }
+
+    .container-title-premium.color-accent {
+        color: #950000 !important;
+    }
+
+    .form-textarea-premium.border-danger {
+        border: 1px solid #fca5a5 !important;
+    }
+
+    .form-textarea-premium.border-danger:focus {
+        border-color: #cd0000 !important;
+        box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1) !important;
+    }
+
+    /* Tombol Submit */
+    .btn-submit-question {
+        width: 100% !important;
+        padding: 14px !important;
+        background: linear-gradient(135deg, #cd0000 0%, #950000 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        cursor: pointer !important;
+        margin-top: 10px !important;
+        box-shadow: 0 5px 15px rgba(205, 0, 0, 0.25) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .btn-submit-question:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 7px 20px rgba(205, 0, 0, 0.35) !important;
+        filter: brightness(1.05) !important;
+    }
+</style>
