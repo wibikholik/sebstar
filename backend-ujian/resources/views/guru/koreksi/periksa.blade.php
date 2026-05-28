@@ -2,92 +2,112 @@
 @section('title', 'Koreksi Jawaban')
 
 @section('content')
-<form action="{{ route('guru.koreksi.update', $student->id) }}" method="POST" class="form-koreksi-premium">
-    @csrf
-    @method('PUT')
-    <input type="hidden" name="schedule_id" value="{{ $schedule->id }}">
+<div class="main-koreksi-wrapper">
+    <form action="{{ route('guru.koreksi.update', $student->id) }}" method="POST" class="form-koreksi-premium">
+        @csrf
+        @method('PUT')
+        <input type="hidden" name="schedule_id" value="{{ $schedule->id }}">
 
-    {{-- Header Profil Siswa --}}
-    <div class="profile-header-premium">
-        <div class="profile-avatar-placeholder">
-            <i class="fas fa-user-gradient"></i>
-        </div>
-        <div class="profile-meta-premium">
-            <h3 class="student-name-premium">{{ $student->name }}</h3>
-            <p class="subject-subtext-premium">
-                <i class="fas fa-book-open"></i> Mata Pelajaran: <strong>{{ $schedule->subject->nama_mapel ?? $schedule->subject->name }}</strong>
-            </p>
-        </div>
-    </div>
-
-    {{-- Loop Butir Jawaban Essay --}}
-    @foreach($essayAnswers as $index => $item)
-    <div class="essay-card-premium">
-        {{-- Nomor Soal --}}
-        <div class="card-badge-header">
-            <span class="question-number-tag">SOAL NOMOR {{ $index + 1 }}</span>
-        </div>
-        
-        <div class="card-body-premium">
-            {{-- Blok Pertanyaan --}}
-            <div class="section-block-premium">
-                <label class="block-label-premium"><i class="fas fa-question-circle"></i> Pertanyaan:</label>
-                <div class="question-display-box">
-                    {!! $item->question->question_text !!}
-                </div>
+        {{-- Header Profil Siswa --}}
+        <div class="profile-header-premium">
+            <div class="profile-avatar-placeholder">
+                <i class="fas fa-user"></i>
             </div>
-
-            {{-- Blok Jawaban Siswa --}}
-            <div class="section-block-premium">
-                <label class="block-label-premium color-red-accent"><i class="fas fa-pen-alt"></i> Jawaban Siswa:</label>
-                <div class="student-answer-box">
-                    {{ $item->answer ?? '(Siswa tidak mengisi jawaban)' }}
-                </div>
-            </div>
-
-            {{-- Panel Penilaian (Skor & Feedback) --}}
-            <div class="assessment-panel-grid">
-                <div class="score-input-wrapper">
-                    <label class="panel-label-premium">Skor (0-100)</label>
-                    <input type="number" 
-                           name="scores[{{ $item->id }}]" 
-                           value="{{ $item->score }}" 
-                           step="0.01" 
-                           required 
-                           min="0" 
-                           max="100"
-                           placeholder="0"
-                           class="input-score-premium">
-                </div>
-                <div class="feedback-input-wrapper">
-                    <label class="panel-label-premium">Catatan / Feedback Guru</label>
-                    <textarea name="notes[{{ $item->id }}]" 
-                              placeholder="Tulis ringkasan masukan atau evaluasi pengerjaan siswa di sini..." 
-                              class="textarea-feedback-premium">{{ $item->teacher_note }}</textarea>
-                </div>
+            <div class="profile-meta-premium">
+                <h3 class="student-name-premium">{{ $student->name }}</h3>
+                <p class="subject-subtext-premium">
+                    <i class="fas fa-book-open"></i> Mata Pelajaran: <strong>{{ $schedule->subject->nama_mapel ?? $schedule->subject->name }}</strong>
+                </p>
             </div>
         </div>
-    </div>
-    @endforeach
 
-    {{-- Floating/Sticky Footer Action Bar --}}
-    <div class="sticky-footer-action-bar">
-        <a href="{{ route('guru.koreksi.index', ['schedule_id' => $schedule->id]) }}" class="btn-cancel-premium">
-            <i class="fas fa-times-circle"></i> Batalkan Penilaian
-        </a>
-        <button type="submit" class="btn-save-all-premium">
-            <i class="fas fa-cloud-upload-alt"></i> Simpan Seluruh Penilaian
-        </button>
-    </div>
-</form>
+        {{-- Loop Berdasarkan Butir Soal Master, Bukan Berdasarkan Isi Jawaban Siswa --}}
+        @foreach($essayQuestions as $index => $question)
+            @php
+                // Ambil record jawaban siswa untuk soal ini (jika ada)
+                $studentAnswer = $question->studentAnswers->first();
+                
+                // Jika siswa pernah mengisi, ambil ID jawabannya untuk key update, jika kosong gunakan string custom kombinasi
+                $inputKey = $studentAnswer ? $studentAnswer->id : 'new_' . $question->id;
+            @endphp
+        <div class="essay-card-premium" style="{{ !$studentAnswer ? 'border-left: 5px solid #cd0000 !important;' : '' }}">
+            {{-- Nomor Soal --}}
+            <div class="card-badge-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="question-number-tag">SOAL NOMOR {{ $index + 1 }}</span>
+                @if(!$studentAnswer)
+                    <span style="font-size: 10px; background: rgba(230, 57, 70, 0.15); color: #cd0000; padding: 3px 10px; border-radius: 12px; font-weight: 800;">KOSONG / TIDAK DIISI</span>
+                @endif
+            </div>
+            
+            <div class="card-body-premium">
+                {{-- Blok Pertanyaan --}}
+                <div class="section-block-premium">
+                    <label class="block-label-premium"><i class="fas fa-question-circle"></i> Pertanyaan:</label>
+                    <div class="question-display-box">
+                        {!! $question->question_text !!}
+                    </div>
+                </div>
 
+                {{-- Blok Jawaban Siswa --}}
+                <div class="section-block-premium">
+                    <label class="block-label-premium color-red-accent"><i class="fas fa-pen-alt"></i> Jawaban Siswa:</label>
+                    <div class="student-answer-box" style="{{ !$studentAnswer ? 'color: #a0aec0 !important; font-style: italic; background: #fafafa !important;' : '' }}">
+                        {{ $studentAnswer->answer ?? '(Siswa melepaskan nomor ini / tidak mengisi jawaban)' }}
+                    </div>
+                </div>
+
+                {{-- Panel Penilaian (Skor & Feedback) --}}
+                <div class="assessment-panel-grid">
+                    <div class="score-input-wrapper">
+                        <label class="panel-label-premium">Skor (0-100)</label>
+                        <input type="number" 
+                               name="scores[{{ $inputKey }}]" 
+                               value="{{ $studentAnswer ? $studentAnswer->score : 0 }}" 
+                               step="0.01" 
+                               required 
+                               min="0" 
+                               max="100"
+                               placeholder="0"
+                               class="input-score-premium"
+                               {{ !$studentAnswer ? 'readonly style=background:#edf2f7;color:#a0aec0;' : '' }}>
+                    </div>
+                    <div class="feedback-input-wrapper">
+                        <label class="panel-label-premium">Catatan / Feedback Guru</label>
+                        <textarea name="notes[{{ $inputKey }}]" 
+                                  placeholder="{{ !$studentAnswer ? 'Tidak perlu diisi karena lembar pengerjaan kosong.' : 'Tulis ringkasan masukan atau evaluasi pengerjaan siswa di sini...' }}" 
+                                  class="textarea-feedback-premium"
+                                  {{ !$studentAnswer ? 'readonly style=background:#edf2f7;' : '' }}>{{ $studentAnswer ? $studentAnswer->teacher_note : 'Jawaban kosong otomatis diberi nilai 0.' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endforeach
+
+        {{-- Footer Action Bar --}}
+        <div class="footer-action-bar-premium">
+            <a href="{{ route('guru.koreksi.index', ['schedule_id' => $schedule->id]) }}" class="btn-cancel-premium">
+                <i class="fas fa-times-circle"></i> Batalkan Penilaian
+            </a>
+            <button type="submit" class="btn-save-all-premium">
+                <i class="fas fa-cloud-upload-alt"></i> Simpan Seluruh Penilaian
+            </button>
+        </div>
+    </form>
+</div>
 <style>
+    /* Container Isolasi Layout Agar Menyesuaikan Space Konten Web Utama */
+    .main-koreksi-wrapper {
+        padding: 10px !important;
+        margin-bottom: 50px !important;
+        box-sizing: border-box !important;
+    }
+
     /* Header Profil Siswa */
     .profile-header-premium {
         background: #ffffff !important;
         padding: 24px !important;
         border-radius: 16px !important;
-        border: 1px solid rgba(0, 0, 0, 0.03) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
         margin-bottom: 24px !important;
         box-shadow: 0 4px 12px rgba(30, 30, 47, 0.04) !important;
         display: flex !important;
@@ -239,19 +259,16 @@
         box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1) !important;
     }
 
-    /* Sticky Footer Bar Manajemen */
-    .sticky-footer-action-bar {
+    /* Perubahan Struktur Action Bar Menjadi Aliran Statis yang Aman */
+    .footer-action-bar-premium {
         display: flex !important;
         justify-content: space-between !important;
         align-items: center !important;
-        margin-top: 36px !important;
-        padding: 16px 28px !important;
+        margin-top: 30px !important;
+        padding: 20px 28px !important;
         background: #1e293b !important;
         border-radius: 16px !important;
         box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.3) !important;
-        position: sticky !important;
-        bottom: 20px !important;
-        z-index: 99 !important;
     }
     .btn-cancel-premium {
         color: #94a3b8 !important;
@@ -287,7 +304,7 @@
         filter: brightness(1.1) !important;
     }
 
-    /* Responsivitas Layar Kecil (Tablet/Mobile) */
+    /* Responsivitas Layar */
     @media (max-width: 640px) {
         .assessment-panel-grid {
             grid-template-columns: 1fr !important;
@@ -296,7 +313,7 @@
         .input-score-premium {
             text-align: left !important;
         }
-        .sticky-footer-action-bar {
+        .footer-action-bar-premium {
             flex-direction: column-reverse !important;
             gap: 14px !important;
             padding: 20px !important;
@@ -307,3 +324,4 @@
         }
     }
 </style>
+@endsection

@@ -2,7 +2,195 @@
 
 @section('title', 'Dashboard Guru')
 
-<style>
+
+
+@section('content')
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_siswa_diajar }}</h2>
+                <p>TOTAL SISWA DIAJAR</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon-wrapper icon-kelas"><i class="fas fa-school"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_kelas_diampu }}</h2>
+                <p>KELAS DIAMPUN</p>
+            </div>
+        </div>
+
+        <a href="{{ route('guru.monitoring.index') }}" class="stat-card">
+            <div class="stat-icon-wrapper icon-tugas"><i class="fas fa-tasks"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_tugas_aktif }}</h2>
+                <p>UJIAN AKTIF</p>
+            </div>
+        </a>
+
+        <a href="{{ route('guru.schedules.index') }}" class="stat-card">
+            <div class="stat-icon-wrapper icon-jadwal"><i class="fas fa-calendar-alt"></i></div>
+            <div class="stat-info">
+                <h2>{{ $jml_jadwal_mengajar }}</h2>
+                <p>JADWAL HARI INI</p>
+            </div>
+        </a>
+    </div>
+
+    <div class="content-box">
+        <div class="box-header">
+            <h3><i class="fas fa-graduation-cap header-icon"></i> Statistik Aktivitas Mengajar</h3>
+        </div>
+        <div class="mini-stats-grid">
+            <div class="mini-card">
+                <div class="mini-card-info">
+                    <p>Mata Pelajaran Anda</p>
+                    <h2>{{ $jml_mapel_guru }}</h2>
+                </div>
+                <i class="fas fa-book mini-card-icon"></i>
+            </div>
+            
+            <a href="{{ route('guru.questions.index') }}" class="mini-card">
+                <div class="mini-card-info">
+                    <p>Bank Soal Buatan</p>
+                    <h2>{{ $jml_materi }}</h2>
+                </div>
+                <i class="fas fa-file-alt mini-card-icon"></i>
+            </a>
+            
+            <a href="{{ route('guru.koreksi.list') }}" class="mini-card highlight">
+                <div class="mini-card-info">
+                    <p>Ujian Belum Diperiksa</p>
+                    <h2>{{ $jml_tugas_belum_diperiksa }}</h2>
+                </div>
+                <i class="fas fa-clock mini-card-icon"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="content-box">
+        <div class="box-header">
+            <h3><i class="fas fa-chart-line header-icon"></i> Grafik Evaluasi Belajar</h3>
+        </div>
+        <div class="charts-grid">
+            
+            <div class="chart-container-box">
+                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
+                    <i class="fas fa-star" style="color: #cd0000; margin-right: 5px;"></i> Rata-rata Nilai Ujian Per Kelas (Siswa Anda)
+                </h4>
+                <div class="chart-wrapper">
+                    <canvas id="chartNilaiKelas"></canvas>
+                </div>
+                <a href="{{ route('guru.schedules.index') }}" class="btn-action-premium">
+                    <i class="fas fa-plus-circle"></i> Buat Sesi Ujian
+                </a>
+            </div>
+
+            <div class="chart-container-box">
+                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
+                    <i class="fas fa-user-check" style="color: #cd0000; margin-right: 5px;"></i> Log Sesi Penyelesaian Ujian (Minggu Ini)
+                </h4>
+                <div class="chart-wrapper">
+                    <canvas id="chartKeaktifanSiswa"></canvas>
+                </div>
+                <a href="{{ route('guru.monitoring.index') }}" class="btn-action-premium">
+                    <i class="fas fa-clipboard-list"></i> Monitor Live Ujian
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            Chart.defaults.maintainAspectRatio = false;
+
+            // Membaca Variabel JSON Hasil Olahan Filter Database Dari Controller
+            const labelKelas = @json($labelKelas);
+            const dataNilaiRataRata = @json($dataNilaiRataRata);
+            const trenUjianSelesai = @json($trenUjianSelesai);
+
+            // Chart 1: Bar Chart Rata-rata Nilai Siswa Per Kelas Yang Diampu Guru
+            new Chart(document.getElementById('chartNilaiKelas'), {
+                type: 'bar',
+                data: {
+                    labels: labelKelas,
+                    datasets: [{ 
+                        label: 'Rata-rata Nilai', 
+                        data: dataNilaiRataRata, 
+                        backgroundColor: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
+                        backgroundColor: '#2ecc71',
+                        borderRadius: 6,
+                        barThickness: 25
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ' Rata-rata: ' + context.raw + ' Poin';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 100, grid: { color: '#eef0f4' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Chart 2: Line Chart Tren Siswa Selesai Ujian Mingguan (Senin - Jumat)
+            new Chart(document.getElementById('chartKeaktifanSiswa'), {
+                type: 'line',
+                data: {
+                    labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
+                    datasets: [{ 
+                        label: 'Siswa Selesai', 
+                        data: trenUjianSelesai, 
+                        borderColor: '#cd0000', 
+                        borderWidth: 3,
+                        backgroundColor: 'rgba(205, 0, 0, 0.05)',
+                        fill: true,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#cd0000',
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.3 
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ' ' + context.raw + ' Siswa Selesai';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { stepSize: 1 },
+                            grid: { color: '#eef0f4' } 
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        });
+    </script>
+    <style>
     /* Background dengan Gradasi Merah-Putih Tegas + Efek Polkadot Grid Modern */
     body {
         background-color: #f4f5f9 !important;
@@ -226,191 +414,4 @@
         transform: rotate(90deg) !important;
     }
 </style>
-
-@section('content')
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
-            <div class="stat-info">
-                <h2>{{ $jml_siswa_diajar }}</h2>
-                <p>TOTAL SISWA DIAJAR</p>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon-wrapper icon-kelas"><i class="fas fa-school"></i></div>
-            <div class="stat-info">
-                <h2>{{ $jml_kelas_diampu }}</h2>
-                <p>KELAS DIAMPUN</p>
-            </div>
-        </div>
-
-        <a href="{{ route('guru.monitoring.index') }}" class="stat-card">
-            <div class="stat-icon-wrapper icon-tugas"><i class="fas fa-tasks"></i></div>
-            <div class="stat-info">
-                <h2>{{ $jml_tugas_aktif }}</h2>
-                <p>UJIAN AKTIF</p>
-            </div>
-        </a>
-
-        <a href="{{ route('guru.schedules.index') }}" class="stat-card">
-            <div class="stat-icon-wrapper icon-jadwal"><i class="fas fa-calendar-alt"></i></div>
-            <div class="stat-info">
-                <h2>{{ $jml_jadwal_mengajar }}</h2>
-                <p>JADWAL HARI INI</p>
-            </div>
-        </a>
-    </div>
-
-    <div class="content-box">
-        <div class="box-header">
-            <h3><i class="fas fa-graduation-cap header-icon"></i> Statistik Aktivitas Mengajar</h3>
-        </div>
-        <div class="mini-stats-grid">
-            <div class="mini-card">
-                <div class="mini-card-info">
-                    <p>Mata Pelajaran Anda</p>
-                    <h2>{{ $jml_mapel_guru }}</h2>
-                </div>
-                <i class="fas fa-book mini-card-icon"></i>
-            </div>
-            
-            <a href="{{ route('guru.questions.index') }}" class="mini-card">
-                <div class="mini-card-info">
-                    <p>Bank Soal Buatan</p>
-                    <h2>{{ $jml_materi }}</h2>
-                </div>
-                <i class="fas fa-file-alt mini-card-icon"></i>
-            </a>
-            
-            <a href="{{ route('guru.koreksi.list') }}" class="mini-card highlight">
-                <div class="mini-card-info">
-                    <p>Ujian Belum Diperiksa</p>
-                    <h2>{{ $jml_tugas_belum_diperiksa }}</h2>
-                </div>
-                <i class="fas fa-clock mini-card-icon"></i>
-            </a>
-        </div>
-    </div>
-
-    <div class="content-box">
-        <div class="box-header">
-            <h3><i class="fas fa-chart-line header-icon"></i> Grafik Evaluasi Belajar</h3>
-        </div>
-        <div class="charts-grid">
-            
-            <div class="chart-container-box">
-                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
-                    <i class="fas fa-star" style="color: #cd0000; margin-right: 5px;"></i> Rata-rata Nilai Ujian Per Kelas (Siswa Anda)
-                </h4>
-                <div class="chart-wrapper">
-                    <canvas id="chartNilaiKelas"></canvas>
-                </div>
-                <a href="{{ route('guru.schedules.index') }}" class="btn-action-premium">
-                    <i class="fas fa-plus-circle"></i> Buat Sesi Ujian
-                </a>
-            </div>
-
-            <div class="chart-container-box">
-                <h4 style="font-size: 14px; color: #1e1e2f; margin: 0 0 15px 0; font-weight: 600; width: 100%; text-align: left;">
-                    <i class="fas fa-user-check" style="color: #cd0000; margin-right: 5px;"></i> Log Sesi Penyelesaian Ujian (Minggu Ini)
-                </h4>
-                <div class="chart-wrapper">
-                    <canvas id="chartKeaktifanSiswa"></canvas>
-                </div>
-                <a href="{{ route('guru.monitoring.index') }}" class="btn-action-premium">
-                    <i class="fas fa-clipboard-list"></i> Monitor Live Ujian
-                </a>
-            </div>
-
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            Chart.defaults.maintainAspectRatio = false;
-
-            // Membaca Variabel JSON Hasil Olahan Filter Database Dari Controller
-            const labelKelas = @json($labelKelas);
-            const dataNilaiRataRata = @json($dataNilaiRataRata);
-            const trenUjianSelesai = @json($trenUjianSelesai);
-
-            // Chart 1: Bar Chart Rata-rata Nilai Siswa Per Kelas Yang Diampu Guru
-            new Chart(document.getElementById('chartNilaiKelas'), {
-                type: 'bar',
-                data: {
-                    labels: labelKelas,
-                    datasets: [{ 
-                        label: 'Rata-rata Nilai', 
-                        data: dataNilaiRataRata, 
-                        backgroundColor: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
-                        backgroundColor: '#2ecc71',
-                        borderRadius: 6,
-                        barThickness: 25
-                    }]
-                },
-                options: { 
-                    responsive: true,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return ' Rata-rata: ' + context.raw + ' Poin';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, max: 100, grid: { color: '#eef0f4' } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-
-            // Chart 2: Line Chart Tren Siswa Selesai Ujian Mingguan (Senin - Jumat)
-            new Chart(document.getElementById('chartKeaktifanSiswa'), {
-                type: 'line',
-                data: {
-                    labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
-                    datasets: [{ 
-                        label: 'Siswa Selesai', 
-                        data: trenUjianSelesai, 
-                        borderColor: '#cd0000', 
-                        borderWidth: 3,
-                        backgroundColor: 'rgba(205, 0, 0, 0.05)',
-                        fill: true,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#cd0000',
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
-                        tension: 0.3 
-                    }]
-                },
-                options: { 
-                    responsive: true,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return ' ' + context.raw + ' Siswa Selesai';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            ticks: { stepSize: 1 },
-                            grid: { color: '#eef0f4' } 
-                        },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        });
-    </script>
 @endsection

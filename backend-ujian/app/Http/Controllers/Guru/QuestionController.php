@@ -8,125 +8,98 @@ use App\Models\Question;
 use App\Models\Schedule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class QuestionController extends Controller
 {
-    /**
-     * Index dialihkan ke jadwal utama
-     */
     public function index()
     {
         return redirect()->route('guru.schedules.index');
     }
 
-    /**
-     * Menampilkan halaman kelola soal
-     */
     public function manage($schedule_id)
     {
-        // 1. Ambil data jadwal aktif
         $schedule = Schedule::with(['subject', 'classroom', 'examType'])->findOrFail($schedule_id);
-
-        // 2. Ambil semua soal yang sudah ada di jadwal ini
-        $questions = Question::where('schedule_id', $schedule_id)
-                             ->latest()
-                             ->get();
-
+        $questions = Question::where('schedule_id', $schedule_id)->latest()->get();
         $teacherId = Auth::id();
 
-        // 3. LOGIC SALIN SOAL:
-        // Ambil jadwal LAIN yang Mapelnya SAMA dan kamu adalah Gurunya
+        // Optimasi: Memastikan pencarian teacher_ids fleksibel terhadap format data
         $otherSchedules = Schedule::with(['classroom', 'subject'])
-            ->where('id', '!=', $schedule_id) // Bukan jadwal yang sedang dibuka
-            ->where('subject_id', $schedule->subject_id) // WAJIB MAPEL YANG SAMA
+            ->where('id', '!=', $schedule_id)
+            ->where('subject_id', $schedule->subject_id)
             ->where(function($query) use ($teacherId) {
-                $query->where('created_by', $teacherId) // Jadwal buatan sendiri
-                      ->orWhereJsonContains('teacher_ids', (string)$teacherId) // Jadwal titipan pusat (JSON)
-                      ->orWhere('teacher_ids', $teacherId); // Backup format string/int
+                $query->where('created_by', $teacherId)
+                      ->orWhereRaw('JSON_CONTAINS(teacher_ids, ?)', [(string)$teacherId])
+                      ->orWhere('teacher_ids', 'LIKE', "%$teacherId%");
             })
-            ->has('questions') // HANYA ambil yang sudah ada soalnya
+            ->has('questions')
             ->get();
 
         return view('guru.questions.manage', compact('schedule', 'questions', 'otherSchedules'));
     }
 
-    /**
-     * Simpan Soal Baru (PG atau Essay)
-     */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
+            'schedule_id'    => 'required|exists:schedules,id',
             'subject_id'     => 'required',
-            'schedule_id'    => 'required',
             'type'           => 'required|in:pg,essay',
             'question_text'  => 'required',
             'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // Validasi opsi wajib jika PG
+            'option_a'       => 'required_if:type,pg',
+            'option_b'       => 'required_if:type,pg',
+            'correct_answer_pg' => 'required_if:type,pg',
         ]);
 
-        $data = [
-            'subject_id'     => $request->subject_id,
-            'schedule_id'    => $request->schedule_id,
-            'user_id'        => Auth::id(),
-            'type'           => $request->type,
-            'question_text'  => $request->question_text,
-            'correct_answer' => ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay,
-        ];
+        try {
+            DB::beginTransaction();
 
-        // Handle Upload Gambar
-        if ($request->hasFile('question_image')) {
-            $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
-        }
+            $data = $request->only(['subject_id', 'schedule_id', 'type', 'question_text']);
+            $data['user_id'] = Auth::id();
+            $data['correct_answer'] = ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay;
 
-        // Handle Opsi PG
-        if ($request->type == 'pg') {
-            foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
-                $data["option_$opt"] = $request->{"option_$opt"};
+            if ($request->hasFile('question_image')) {
+                $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
             }
+
+            if ($request->type == 'pg') {
+                foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
+                    $data["option_$opt"] = $request->{"option_$opt"};
+                }
+            }
+
+            Question::create($data);
+            DB::commit();
+
+            return redirect()->route('guru.questions.manage', $request->schedule_id)
+                             ->with('success', 'Soal berhasil ditambahkan!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
         }
-
-        Question::create($data);
-
-        return redirect()->route('guru.questions.manage', $request->schedule_id)
-                         ->with('success', 'Soal berhasil ditambahkan!');
     }
 
-    /**
-     * Update Soal yang sudah ada
-     */
     public function update(Request $request, $id)
     {
         $question = Question::findOrFail($id);
-
+        
         $request->validate([
-            'schedule_id'    => 'required',
-            'type'           => 'required|in:pg,essay',
             'question_text'  => 'required',
-            'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'type'           => 'required|in:pg,essay',
         ]);
 
-        $data = [
-            'type'           => $request->type,
-            'question_text'  => $request->question_text,
-            'correct_answer' => ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay,
-        ];
+        $data = $request->only(['type', 'question_text']);
+        $data['correct_answer'] = ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay;
 
-        // Update Gambar jika ada file baru
         if ($request->hasFile('question_image')) {
-            if ($question->question_image) {
-                Storage::disk('public')->delete($question->question_image);
-            }
+            if ($question->question_image) Storage::disk('public')->delete($question->question_image);
             $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
         }
 
-        // Mapping Opsi PG atau Reset jika ganti ke Essay
-        if ($request->type == 'pg') {
-            foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
-                $data["option_$opt"] = $request->{"option_$opt"};
-            }
-        } else {
-            foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
-                $data["option_$opt"] = null;
-            }
+        // Logic reset/update opsi
+        foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
+            $data["option_$opt"] = ($request->type == 'pg') ? $request->{"option_$opt"} : null;
         }
 
         $question->update($data);
@@ -134,6 +107,8 @@ class QuestionController extends Controller
         return redirect()->route('guru.questions.manage', $request->schedule_id)
                          ->with('success', 'Soal berhasil diperbarui!');
     }
+    
+
 
     /**
      * Copy Soal dari Jadwal Sumber ke Jadwal Target

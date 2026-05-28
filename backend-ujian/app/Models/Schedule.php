@@ -68,4 +68,12 @@ class Schedule extends Model
     {
         return User::whereIn('id', $this->teacher_ids ?? [])->get();
     }
+    public function answers()
+    {
+        // Pastikan foreign key di tabel student_answers bernama 'schedule_id'
+        return $this->hasMany(StudentAnswer::class, 'schedule_id');
+    }
+    public function class() {
+    return $this->belongsTo(Classroom::class, 'classroom_id'); // Sesuaikan nama model & foreign key-nya
+}
 }

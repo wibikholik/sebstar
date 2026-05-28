@@ -7,7 +7,7 @@ use App\Models\Question;
 use App\Models\Schedule;
 use App\Models\StudentAnswer;
 use App\Models\ExamLog; 
-use App\Events\ExamMonitoringEvent; // 📢 Import Event Reverb agar log mobile tersiar ke Web Guru
+use App\Events\ExamMonitoringEvent; // 📢 Broadcast Event Reverb Real-time
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -23,7 +23,7 @@ class ExamController extends Controller
             return response()->json(['message' => 'Ujian tidak ditemukan'], 404);
         }
 
-        // 🛑 TAMBAHAN: Cegah login jika siswa berstatus Diskualifikasi atau di-Force Submit
+        // 🛑 Cegah login jika siswa berstatus Diskualifikasi atau di-Force Submit
         $userId = Auth::id();
         $isLocked = ExamLog::where('schedule_id', $id)
             ->where('user_id', $userId)
@@ -51,7 +51,7 @@ class ExamController extends Controller
             return response()->json(['message' => 'Akses ditolak'], 403);
         }
 
-        // 🛑 PERBAIKAN UTAMA: Blokir total pengambilan soal jika siswa sedang didiskualifikasi / force submit
+        // 🛑 Blokir total pengambilan soal jika siswa sedang didiskualifikasi / force submit
         $isLocked = ExamLog::where('schedule_id', $id)
             ->where('user_id', $userId)
             ->whereIn('type', ['KELUAR_APLIKASI', 'keluar_aplikasi', 'FORCE_SUBMIT'])
@@ -89,7 +89,7 @@ class ExamController extends Controller
             return response()->json(['message' => 'Sesi ujian tidak valid'], 403);
         }
 
-        // 🛑 TAMBAHAN: Blokir auto-save jawaban jika statusnya sudah dikunci (mencegah manipulasi paksa dari HP)
+        // 🛑 Blokir auto-save jawaban jika statusnya sudah dikunci
         $isLocked = ExamLog::where('schedule_id', $id)
             ->where('user_id', $userId)
             ->whereIn('type', ['KELUAR_APLIKASI', 'keluar_aplikasi', 'FORCE_SUBMIT'])
@@ -141,8 +141,8 @@ class ExamController extends Controller
                                     ->where('user_id', Auth::id())
                                     ->get();
 
-        $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
-        $essayAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'essay');
+        $pgAnswers = $userAnswers->filter(fn($a) => $a->question && $a->question->type === 'pg');
+        $essayAnswers = $userAnswers->filter(fn($a) => $a->question && $a->question->type === 'essay');
 
         $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
         $pgCorrect = 0;
@@ -152,12 +152,16 @@ class ExamController extends Controller
             }
         }
         $scorePgRaw = ($pgCorrect / $totalPg) * 100;
-        $scoreEssayRaw = $essayAnswers->sum('score');
+
+        // 📢 FIX UTAMA SINKRONISASI: Menggunakan avg() rata-rata agar berskala 0-100 kembali
+        $scoreEssayRaw = $essayAnswers->count() > 0 ? $essayAnswers->where('is_graded', true)->avg('score') : 0;
 
         $wPg = ($schedule->weight_pg ?? 60) / 100;
         $wEssay = ($schedule->weight_essay ?? 40) / 100;
 
         $finalScore = ($scorePgRaw * $wPg) + ($scoreEssayRaw * $wEssay);
+        
+        // Pengecekan apakah seluruh lembar esai milik siswa ini sudah diberi nilai oleh guru pengampu
         $isGradedAll = $essayAnswers->isEmpty() ? true : !$essayAnswers->where('is_graded', false)->count();
 
         return response()->json([
@@ -165,7 +169,7 @@ class ExamController extends Controller
             'data' => [
                 'subject_name' => $schedule->subject->nama_mapel ?? 'N/A',
                 'tanggal_ujian' => \Carbon\Carbon::parse($schedule->tanggal_ujian)->translatedFormat('d F Y'),
-                'final_score' => $isGradedAll ? round($finalScore, 2) : 0,
+                'final_score' => $isGradedAll ? round($finalScore, 2) : 0, // Hanya publish nilai jika koreksi esai 100% beres
                 'is_complete' => $isGradedAll,
                 'breakdown' => [
                     'score_pg' => round($scorePgRaw, 2),
@@ -183,7 +187,7 @@ class ExamController extends Controller
                     'total' => Question::where('subject_id', $schedule->subject_id)->where('type', 'essay')->count()
                 ],
                 'details' => $userAnswers->map(fn($item) => [
-                    'question' => $item->question->question_text,
+                    'question' => $item->question->question_text ?? '',
                     'score' => $item->score,
                     'teacher_note' => $item->teacher_note
                 ])
@@ -208,7 +212,7 @@ class ExamController extends Controller
                                         ->where('user_id', $userId)
                                         ->get();
 
-            $pgAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'pg');
+            $pgAnswers = $userAnswers->filter(fn($a) => $a->question && $a->question->type === 'pg');
             $totalPg = Question::where('subject_id', $schedule->subject_id)->where('type', 'pg')->count() ?: 1;
             
             $pgCorrect = 0;
@@ -219,29 +223,31 @@ class ExamController extends Controller
             }
             $scorePgRaw = ($pgCorrect / $totalPg) * 100;
 
-            $essayAnswers = $userAnswers->filter(fn($a) => $a->question->type === 'essay');
-            $scoreEssayRaw = $essayAnswers->sum('score');
+            $essayAnswers = $userAnswers->filter(fn($a) => $a->question && $a->question->type === 'essay');
+            
+            // 📢 FIX UTAMA SINKRONISASI: Menggunakan avg() rata-rata untuk riwayat nilai
+            $scoreEssayRaw = $essayAnswers->count() > 0 ? $essayAnswers->where('is_graded', true)->avg('score') : 0;
 
             $wPg = ($schedule->weight_pg ?? 60) / 100;
             $wEssay = ($schedule->weight_essay ?? 40) / 100;
             
             $finalScore = ($scorePgRaw * $wPg) + ($scoreEssayRaw * $wEssay);
 
+            // Cek status apakah nilai esai sudah siap dipublish total ke rapor mobile siswa
+            $isGradedAll = $essayAnswers->isEmpty() ? true : !$essayAnswers->where('is_graded', false)->count();
+
             return [
                 'id'            => $schedule->id,
                 'token'         => $schedule->token,
                 'nama_mapel'    => $schedule->subject->nama_mapel ?? 'N/A',
                 'tanggal_ujian' => \Carbon\Carbon::parse($schedule->tanggal_ujian)->translatedFormat('d M Y'),
-                'score'         => round($finalScore, 2)
+                'score'         => $isGradedAll ? round($finalScore, 2) : 0 // Tetap tampilkan 0 di history jika guru belum beres mengoreksi
             ];
-        });
+        ]);
 
         return response()->json($history, 200);
     }
 
-    /**
-     * 3. PERBAIKAN MODUL PENGAWASAN: Menyimpan log kecurangan SEKALIGUS melakukan real-time broadcast ke Web Guru
-     */
     public function logPelanggaran(Request $request, $id)
     {
         $request->validate([
@@ -252,16 +258,14 @@ class ExamController extends Controller
         try {
             $userId = Auth::id(); 
 
-            // Simpan record kecurangan siswa ke database
             $log = ExamLog::create([
                 'schedule_id' => $id, 
                 'user_id' => $userId,
-                'type' => strtoupper($request->type), // Mengubah string menjadi huruf kapital murni ('KELUAR_APLIKASI')
+                'type' => strtoupper($request->type), 
                 'details' => $request->details ?? 'Siswa terdeteksi memindahkan fokus layar ujian browser ketat.',
                 'created_at' => Carbon::now('Asia/Jakarta')
             ]);
 
-            // 📢 PERBAIKAN REAL-TIME: Siarkan kejadian curang ini lewat Reverb agar web guru langsung berkedip merah otomatis!
             broadcast(new ExamMonitoringEvent($id, $userId, 'PELANGGARAN', "Siswa terdeteksi melakukan tindakan: {$request->type}."))->toOthers();
 
             return response()->json([

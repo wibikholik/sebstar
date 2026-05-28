@@ -39,4 +39,16 @@ class Question extends Model
     {
         return $this->belongsTo(User::class);
     }
+    /**
+     * Relasi ke Jadwal Ujian
+     */
+    public function schedule()
+    {
+        return $this->belongsTo(Schedule::class);
+    }
+    public function studentAnswers()
+    {
+        // Pastikan foreign key di tabel student_answers bernama 'question_id'
+        return $this->hasMany(StudentAnswer::class, 'question_id');
+    }
 }
