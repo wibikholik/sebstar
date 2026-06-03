@@ -8,6 +8,8 @@ use App\Models\Subject;
 use App\Models\Classroom;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\UsersImport;
 
 class UserController extends Controller
 {
@@ -158,4 +160,52 @@ class UserController extends Controller
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus!');
     }
+    public function importExcel(Request $request)
+{
+    $request->validate([
+        'file_excel' => 'required|mimes:xlsx,xls,csv|max:5120', // Validasi file maks 5MB
+    ]);
+
+    try {
+        Excel::import(new UsersImport, $request->file('file_excel'));
+        
+        return redirect()->back()->with('success', '✨ Data pengguna berhasil diimpor massal ke database!');
+    } catch (\Exception $e) {
+        return redirect()->back()->with('error', '⚠ Gagal memproses data. Periksa kembali struktur template! Info: ' . $e->getMessage());
+    }
+}
+
+public function downloadTemplate()
+{
+    $namaFile = "template_pengguna_sebstar.csv";
+
+    $headers = [
+        "Content-type"        => "text/csv; charset=UTF-8",
+        "Content-Disposition" => "attachment; filename={$namaFile}",
+        "Pragma"              => "no-cache",
+        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+        "Expires"             => "0"
+    ];
+
+    // Menggunakan nama_kelas dan nama_mapel agar manusiawi bagi Admin
+    $columns = ['name', 'email', 'password', 'role', 'nomor_induk', 'nama_kelas', 'nama_mapel'];
+
+    $callback = function() use($columns) {
+        $file = fopen('php://output', 'w');
+        fputcsv($file, $columns);
+        
+        // Contoh Siswa: Langsung isi teks nama kelasnya
+        fputcsv($file, ['Ahmad Siswa', 'ahmad@sebstar.com', 'rahasia123', 'siswa', '10224001', 'XI-RPL-1', '']);
+        
+        // Contoh Guru: Langsung isi teks nama mata pelajarannya
+        fputcsv($file, ['Budi Guru', 'budi@sebstar.com', 'passwordguru', 'guru', '1988010202', '', 'Matematika']);
+        
+        // Contoh Pengawas
+        fputcsv($file, ['Siti Pengawas', 'siti@sebstar.com', 'passwordpw', 'pengawas', '1992050301', '', '']);
+        
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
 }

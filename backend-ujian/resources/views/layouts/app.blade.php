@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title') - Sebstar </title>
+    <link rel="icon" type="image/png" href="{{ asset('images/LOGO.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         :root {
             --red-sebstar: #cd0000;
@@ -203,16 +205,7 @@
     
 
     <main class="main-content">
-        <header class="header-content">
-            <div class="header-title">
-                <h1>@yield('title')</h1>
-                <p>Selamat datang di SEBSTAR</p>
-            </div>
-            <div class="user-info">
-                <span class="role">{{ auth()->user()->role }}</span>
-                <span class="date">{{ now()->translatedFormat('l, d F Y') }}</span>
-            </div>
-        </header>
+        @include('layouts.partials.navbar')
 
         @yield('content')
     </main>

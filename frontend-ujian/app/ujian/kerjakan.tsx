@@ -54,7 +54,10 @@ export default function KerjakanScreen() {
   const [sideNavVisible, setSideNavVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-width)).current;
 
+  // PERBAIKAN URL GAMBAR:
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+  // Menghapus "/api" dari BASE_URL khusus untuk memuat gambar dari storage
+  const ASSET_URL = BASE_URL ? BASE_URL.replace(/\/api$/, '') : ''; 
   const REVERB_KEY = process.env.EXPO_PUBLIC_REVERB_KEY;
   const primaryRed = '#c91313';
 
@@ -67,7 +70,6 @@ export default function KerjakanScreen() {
   // --- 1. FUNGSI ALARM PERINGATAN (DIBATASI MAKSIMAL 2 KALI PUTARAN) ---
   async function playWarningSound() {
     try {
-      // Bersihkan sisa objek audio lama jika masih menggantung
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
@@ -80,7 +82,6 @@ export default function KerjakanScreen() {
 
       const triggerAudioPlay = async () => {
         if (playCount >= 2) {
-          // Jika sudah berbunyi 2 kali, matikan interval otomatis
           if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
           await stopWarningSound();
           return;
@@ -100,10 +101,8 @@ export default function KerjakanScreen() {
         }
       };
 
-      // Jalankan bunyi pertama langsung
       await triggerAudioPlay();
 
-      // Jalankan bunyi kedua dengan jeda waktu 2.5 detik (sesuai rata-rata durasi file mp3 alert)
       soundIntervalRef.current = setInterval(async () => {
         await triggerAudioPlay();
       }, 2500);
@@ -137,7 +136,6 @@ export default function KerjakanScreen() {
 
     console.log(`🛑 Tindakan Kecurangan Terdeteksi: ${alasan}`);
     
-    // Mainkan alarm terkunci (maksimal 2 kali putar)
     await playWarningSound();
 
     try {
@@ -151,7 +149,6 @@ export default function KerjakanScreen() {
       console.log("Gagal kirim log pelanggaran ke backend:", e.message); 
     }
 
-    // Tendang keluar paksa ke login
     router.replace('/(auth)/login');
 
     if (Platform.OS === 'web') {
@@ -228,7 +225,6 @@ export default function KerjakanScreen() {
     });
 
     const blurSubscription = navigation.addListener('blur', async () => {
-      // Pastikan saat pindah karena disubmit normal, suara tidak dituduh curang
       if (!isSubmitted) {
         eksekusiDiskualifikasi("Kehilangan fokus layar pengerjaan utama.");
       }
@@ -245,7 +241,6 @@ export default function KerjakanScreen() {
         ScreenCapture.allowScreenCaptureAsync().catch(() => {});
       }
       
-      // Paksa matikan semua jenis interval bunyi saat siklus komponen hancur/pindah halaman
       if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
       if (soundRef.current) {
         soundRef.current.unloadAsync().catch(() => {});
@@ -320,7 +315,6 @@ export default function KerjakanScreen() {
 
   const confirmFinish = async (isAuto = false) => {
     setModalVisible(false);
-    // Hentikan alarm sesegera mungkin saat mengumpulkan lembar jawaban resmi
     await stopWarningSound();
     try {
       await api.post(`/ujian/${id}/finish`, {}, { headers: { 'X-Exam-Token': token } });
@@ -382,7 +376,8 @@ export default function KerjakanScreen() {
           
           {currentItem?.question_image && (
             <Image 
-              source={{ uri: `${BASE_URL}/storage/${currentItem.question_image}` }} 
+              // SUDAH DIGANTI MENGGUNAKAN ASSET_URL
+              source={{ uri: `${ASSET_URL}/storage/${currentItem.question_image}` }} 
               style={styles.image} 
               resizeMode="contain" 
             />

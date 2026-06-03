@@ -30,7 +30,7 @@ export default function DashboardScreen() {
   const [tokenInput, setTokenInput] = useState('');
   const [verifying, setVerifying] = useState(false);
 
-  // STATE BARU: UNTUK CUSTOM ALERT MODAL (SOLUSI GAIRAH WEB & MOBILE)
+  // STATE: CUSTOM ALERT MODAL
   const [customAlert, setCustomAlert] = useState({
     visible: false,
     title: '',
@@ -40,7 +40,7 @@ export default function DashboardScreen() {
   });
 
   const router = useRouter();
-  const primaryRed = '#c91313';
+  const primaryRed = '#c91313'; // Warna Identitas Sebstar
 
   useEffect(() => {
     fetchData();
@@ -70,12 +70,10 @@ export default function DashboardScreen() {
     }
   };
 
-  // --- LOGIKA UTAMA EKSEKUSI API LOGOUT ---
   const executeLogout = async () => {
     setLoading(true);
     try {
       await api.post('/logout'); 
-      console.log("Server merespon sukses logout.");
     } catch (e) {
       console.log("Bypass API Logout.");
     } finally {
@@ -93,7 +91,6 @@ export default function DashboardScreen() {
     }
   };
 
-  // --- TRIGGER ALERT SYSTEM MULTI-PLATFORM ---
   const bukaAlertKustom = (title, message, type = 'info', onConfirmCallback = null) => {
     setCustomAlert({
       visible: true,
@@ -106,7 +103,7 @@ export default function DashboardScreen() {
 
   const handleLogoutPress = () => {
     bukaAlertKustom(
-      "Konfirmasi Keluar", 
+      "Keluar Akun", 
       "Apakah Anda yakin ingin keluar dari akun ujian Anda?", 
       "konfirmasi", 
       executeLogout
@@ -160,41 +157,73 @@ export default function DashboardScreen() {
     }
   };
 
+  // RENDER SEAMLESS PROFILE HEADER INSIDE FLATLIST
+  const renderHeaderComponent = () => (
+    <View style={styles.profileSection}>
+      <View style={styles.profileLeft}>
+        <Text style={styles.welcomeText}>Selamat Datang</Text>
+        <Text style={styles.userNameText}>{user?.name ?? 'Siswa Ujian'}</Text>
+        <View style={styles.classRow}>
+          <Ionicons name="school-outline" size={14} color="#64748b" />
+          <Text style={styles.classText}>{user?.classroom?.nama_kelas ?? 'XII RPL'}</Text>
+        </View>
+      </View>
+      
+      <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutIconButton} activeOpacity={0.6}>
+        <Ionicons name="log-out-outline" size={20} color="#c91313" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderEmptyList = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="file-tray-outline" size={48} color="#94a3b8" />
+      <Text style={styles.emptyTitle}>Belum ada jadwal ujian</Text>
+      <Text style={styles.emptySubtitle}>Jadwal aktif atau riwayat ujian Anda akan terdaftar di sini.</Text>
+    </View>
+  );
+
   const renderJadwal = ({ item }) => {
     const isFinished = item.is_finished;
     const isActive = item.status === 'aktif' && !isFinished;
-    const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#94a3b8');
+    const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#64748b');
+    const badgeBg = isFinished ? '#f0fdf4' : (isActive ? '#fef2f2' : '#f8fafc');
 
     return (
-      <View style={[styles.card, isActive && styles.cardActive]}>
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.mapel}>{item.subject?.nama_mapel ?? 'Mapel'}</Text>
-            <Text style={[styles.examType, { color: isActive ? primaryRed : '#64748b' }]}>
-                {item.exam_type?.name ?? 'Ujian'}
+      <View style={[styles.examCard, isActive && styles.examCardActive]}>
+        <View style={styles.cardMainInfo}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={[styles.examBadgeText, { color: themeColor }]}>
+              {item.exam_type?.name ?? 'UJIAN'}
+            </Text>
+            <Text style={styles.subjectName} numberOfLines={2}>
+              {item.subject?.nama_mapel ?? 'Mata Pelajaran'}
             </Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: themeColor + '15' }]}>
-            <Text style={[styles.badgeText, { color: themeColor }]}>
+          <View style={[styles.statusBadge, { backgroundColor: badgeBg, borderColor: themeColor + '25' }]}>
+            <Text style={[styles.statusBadgeText, { color: themeColor }]}>
               {isFinished ? 'SELESAI' : (item.status ? item.status.toUpperCase() : 'NONAKTIF')}
             </Text>
           </View>
         </View>
 
-        <View style={styles.footer}>
-            <View style={styles.timeGroup}>
-                <Ionicons name="timer-outline" size={16} color="#1e293b" />
-                <Text style={styles.timeText}>{item.durasi} Menit</Text>
-            </View>
-            <View style={styles.timeGroup}>
-                <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
-                <Text style={styles.dateText}>{formatTanggal(item.tanggal_ujian)}</Text>
-            </View>
+        <View style={styles.cardDetailsRow}>
+          <View style={styles.detailItem}>
+            <Ionicons name="time-outline" size={14} color="#94a3b8" />
+            <Text style={styles.detailText}>{item.durasi} Menit</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
+            <Text style={styles.detailText}>{formatTanggal(item.tanggal_ujian)}</Text>
+          </View>
         </View>
 
         <TouchableOpacity 
           activeOpacity={0.8}
-          style={[styles.btnAction, { backgroundColor: isFinished ? '#1e293b' : (isActive ? primaryRed : '#e2e8f0') }]}
+          style={[
+            styles.actionButton, 
+            isFinished ? styles.btnFinished : (isActive ? styles.btnActive : styles.btnInactive)
+          ]}
           onPress={() => {
             if (isActive) {
               handleOpenTokenModal(item);
@@ -205,10 +234,14 @@ export default function DashboardScreen() {
               });
             }
           }}
+          disabled={!isActive && !isFinished}
         >
-          <Text style={[styles.btnText, { color: (isActive || isFinished) ? '#fff' : '#94a3b8' }]}>
+          <Text style={[styles.actionButtonText, { color: (isActive || isFinished) ? '#fff' : '#94a3b8' }]}>
             {isFinished ? 'LIHAT HASIL' : (isActive ? 'MASUK UJIAN' : 'BELUM AKTIF')}
           </Text>
+          {(isActive || isFinished) && (
+            <Ionicons name="arrow-forward" size={14} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -216,71 +249,61 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* HEADER CONTAINER */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-            <Text style={styles.welcome}>Selamat Datang,</Text>
-            <Text style={styles.userName} numberOfLines={1}>{user?.name ?? 'Siswa Percobaan'}</Text>
-            <View style={styles.classBadge}>
-                <Text style={styles.classText}>{user?.classroom?.nama_kelas ?? 'XII RPL'}</Text>
-            </View>
-        </View>
-        
-        <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutBtn} activeOpacity={0.4}>
-            <Ionicons name="log-out-outline" size={26} color="#c91313" />
-        </TouchableOpacity>
-      </View>
-
-      {/* BODY CONTENT */}
       <View style={styles.body}>
         {loading && !refreshing ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#c91313" />
+            <ActivityIndicator size="small" color={primaryRed} />
           </View>
         ) : (
           <FlatList
             data={jadwal}
             renderItem={renderJadwal}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ padding: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 30 }}
+            ListHeaderComponent={renderHeaderComponent}
+            ListEmptyComponent={renderEmptyList}
+            showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#c91313" />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryRed} colors={[primaryRed]} />
             }
           />
         )}
       </View>
 
-      {/* MODAL TOKEN INPUT (RELIABLE FOR WEB) */}
+      {/* MODAL TOKEN INPUT (MODERN FLAT STYLE) */}
       {modalVisible && (
         <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Verifikasi Token</Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#64748b" />
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                  <Ionicons name="close" size={18} color="#64748b" />
                 </TouchableOpacity>
               </View>
               
               <Text style={styles.modalSubTitle}>
-                Silahkan masukkan kode token untuk mata pelajaran:{"\n"}
-                <Text style={{fontWeight: '800', color: '#1e293b'}}>{selectedExam?.subject?.nama_mapel}</Text>
+                Silahkan masukkan kode token ujian untuk mata pelajaran:{"\n"}
+                <Text style={{fontWeight: '700', color: '#0f172a'}}>{selectedExam?.subject?.nama_mapel}</Text>
               </Text>
 
-              <TextInput
-                style={styles.tokenInput}
-                placeholder="TOKEN"
-                value={tokenInput}
-                onChangeText={setTokenInput}
-                autoCapitalize="characters"
-                maxLength={6}
-              />
+              <View style={styles.tokenWrapper}>
+                <TextInput
+                  style={styles.tokenInput}
+                  placeholder="TOKEN"
+                  placeholderTextColor="#94a3b8"
+                  value={tokenInput}
+                  onChangeText={setTokenInput}
+                  autoCapitalize="characters"
+                  maxLength={6}
+                />
+              </View>
 
               <TouchableOpacity style={styles.modalBtn} onPress={handleVerifyToken} disabled={verifying}>
                 {verifying ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.modalBtnText}>KONFIRMASI MASUK</Text>
                 )}
@@ -290,19 +313,18 @@ export default function DashboardScreen() {
         </Modal>
       )}
 
-      {/* ========================================== */}
-      {/* 🛡️ KUSTOM MODAL ALERT (SOLUSI UTAMA WEB)   */}
-      {/* ========================================== */}
+      {/* CUSTOM MODAL ALERT (MODERN FLAT STYLE) */}
       {customAlert.visible && (
         <Modal animationType="fade" transparent={true} visible={customAlert.visible}>
           <View style={styles.modalOverlay}>
             <View style={styles.customAlertCard}>
-              <Ionicons 
-                name={customAlert.type === 'konfirmasi' ? "help-circle-outline" : "alert-circle-outline"} 
-                size={50} 
-                color={primaryRed} 
-                style={{ marginBottom: 10 }} 
-              />
+              <View style={[styles.alertIconWrapper, { backgroundColor: customAlert.type === 'konfirmasi' ? '#fef2f2' : '#f8fafc' }]}>
+                <Ionicons 
+                  name={customAlert.type === 'konfirmasi' ? "log-out" : "information-circle"} 
+                  size={24} 
+                  color={customAlert.type === 'konfirmasi' ? primaryRed : '#64748b'} 
+                />
+              </View>
               <Text style={styles.customAlertTitle}>{customAlert.title}</Text>
               <Text style={styles.customAlertMessage}>{customAlert.message}</Text>
               
@@ -340,62 +362,82 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
-  body: { flex: 1, zIndex: 1 }, 
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    justifyContent: 'space-between', 
-    paddingHorizontal: 25, 
-    paddingTop: Platform.OS === 'web' ? 25 : 60, 
-    paddingBottom: 25, 
-    backgroundColor: '#fff', 
-    borderBottomLeftRadius: 30, 
-    borderBottomRightRadius: 30, 
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    zIndex: 999, 
-  },
-  headerLeft: { flex: 1, alignItems: 'flex-start' },
-  logoutBtn: { padding: 12, backgroundColor: '#fee2e2', borderRadius: 12, marginLeft: 15, elevation: 2 },
-  welcome: { fontSize: 13, color: '#64748b' },
-  userName: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  classBadge: { alignSelf: 'flex-start', backgroundColor: '#c91313', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginTop: 5 },
-  classText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 24, marginBottom: 18, elevation: 3 },
-  cardActive: { borderLeftWidth: 6, borderLeftColor: '#c91313' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  mapel: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
-  examType: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'center' },
-  timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  timeText: { fontSize: 15, fontWeight: '800' },
-  dateText: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  btnAction: { padding: 16, borderRadius: 15, alignItems: 'center' },
-  btnText: { fontWeight: '800', fontSize: 14 },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 200 },
+  body: { flex: 1 }, 
   
-  // MODAL OVERLAYS
-  modalOverlay: { position: Platform.OS === 'web' ? 'fixed' : 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
-  modalContent: { width: Platform.OS === 'web' ? '400px' : '90%', backgroundColor: '#fff', borderRadius: 25, padding: 25, elevation: 10 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  modalSubTitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 20 },
-  tokenInput: { backgroundColor: '#f1f5f9', padding: 18, borderRadius: 15, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: 5, color: '#c91313', marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  modalBtn: { backgroundColor: '#c91313', padding: 18, borderRadius: 15, alignItems: 'center' },
-  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  // SEAMLESS INLINE PROFILE HEADER
+  profileSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'web' ? 20 : 50,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 20,
+  },
+  profileLeft: { flex: 1 },
+  welcomeText: { fontSize: 11, color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  userNameText: { fontSize: 20, fontWeight: '700', color: '#0f172a', marginTop: 2 },
+  classRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  classText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  logoutIconButton: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#fee2e2', backgroundColor: '#fff5f5' },
+
+  // EMPTY STATE
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#334155', marginTop: 10 },
+  emptySubtitle: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 2, paddingHorizontal: 20 },
+
+  // CRISP ULTRA-MODERN EXAM CARDS
+  examCard: { 
+    backgroundColor: '#ffffff', 
+    padding: 16, 
+    borderRadius: 12, 
+    marginBottom: 12, 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0' 
+  },
+  examCardActive: { 
+    borderColor: '#c91313',
+    backgroundColor: '#fffdfd'
+  },
+  cardMainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  examBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
+  subjectName: { fontSize: 16, fontWeight: '600', color: '#0f172a', lineHeight: 22 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  statusBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  
+  cardDetailsRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  detailText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  
+  actionButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 8, gap: 6 },
+  actionButtonText: { fontWeight: '600', fontSize: 13, letterSpacing: 0.2 },
+  btnActive: { backgroundColor: '#c91313' },
+  btnFinished: { backgroundColor: '#0f172a' },
+  btnInactive: { backgroundColor: '#f1f5f9' },
+  
+  // MODAL TOKEN OVERLAYS (FLAT & MODERN)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: Platform.OS === 'web' ? '380px' : '100%', backgroundColor: '#ffffff', borderRadius: 12, padding: 20, borderWidth: 1, borderColor: '#e2e8f0' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  modalSubTitle: { fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 18 },
+  closeBtn: { backgroundColor: '#f1f5f9', padding: 6, borderRadius: 6 },
+  
+  tokenWrapper: { backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
+  tokenInput: { padding: 12, fontSize: 22, fontWeight: '700', textAlign: 'center', letterSpacing: 6, color: '#c91313' },
+  modalBtn: { backgroundColor: '#c91313', padding: 14, borderRadius: 8, alignItems: 'center' },
+  modalBtnText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
 
   // STYLES CUSTOM ALERT MODAL
-  customAlertCard: { width: Platform.OS === 'web' ? '360px' : '85%', backgroundColor: '#fff', padding: 25, borderRadius: 24, alignItems: 'center', elevation: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 },
-  customAlertTitle: { fontSize: 18, fontWeight: '900', color: '#1e293b', marginBottom: 10, textAlign: 'center' },
-  customAlertMessage: { fontSize: 14, color: '#475569', fontWeight: '500', marginBottom: 20, textAlign: 'center', lineHeight: 20 },
-  alertConfirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  alertConfirmText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  alertCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#f1f5f9' },
-  alertCancelText: { color: '#64748b', fontWeight: '800', fontSize: 15 }
+  customAlertCard: { width: Platform.OS === 'web' ? '340px' : '90%', backgroundColor: '#ffffff', padding: 20, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  alertIconWrapper: { padding: 10, borderRadius: 50, marginBottom: 12 },
+  customAlertTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 6, textAlign: 'center' },
+  customAlertMessage: { fontSize: 13, color: '#64748b', fontWeight: '500', marginBottom: 20, textAlign: 'center', lineHeight: 18 },
+  alertConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  alertConfirmText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
+  alertCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#f1f5f9' },
+  alertCancelText: { color: '#475569', fontWeight: '600', fontSize: 14 }
 });

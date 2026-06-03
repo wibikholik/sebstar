@@ -11,30 +11,42 @@ use Illuminate\Support\Facades\DB;
 use App\Exports\NilaiUjianExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Question;
+
 class KoreksiController extends Controller
 {
     /**
      * 1. Menampilkan daftar jadwal ujian (Dipanggil dari Sidebar)
      */
     public function listSchedules()
-    {
-        $schedules = Schedule::whereJsonContains('teacher_ids', (string) auth()->id())
-            ->withCount(['answers as total_essay_count' => function($q) {
-                $q->whereHas('question', function($query) {
-                    $query->where('type', 'essay');
-                });
-            }])
-            ->withCount(['answers as graded_essay_count' => function($q) {
-                $q->where('is_graded', true)
-                  ->whereHas('question', function($query) {
-                      $query->where('type', 'essay');
-                  });
-            }])
-            ->orderBy('created_at', 'desc')
-            ->get();
-        
-        return view('guru.koreksi.list_jadwal', compact('schedules'));
-    }
+{
+    $teacherId = auth()->id();
+
+    $schedules = Schedule::query()
+        // Opsi 1: Jika menggunakan kolom JSON array 'teacher_ids'
+        // Kita cek dua-duanya (sebagai integer maupun string) agar aman dari mismatch tipe data
+        ->where(function($query) use ($teacherId) {
+            $query->whereJsonContains('teacher_ids', $teacherId)
+                  ->orWhereJsonContains('teacher_ids', (string) $teacherId);
+                  
+            // Opsi Tambahan (Aktifkan ini jika ternyata nama kolomnya di database adalah 'teacher_id' murni / bukan JSON)
+            // ->orWhere('teacher_id', $teacherId); 
+        })
+        ->withCount(['answers as total_essay_count' => function($q) {
+            $q->whereHas('question', function($query) {
+                $query->where('type', 'essay');
+            });
+        }])
+        ->withCount(['answers as graded_essay_count' => function($q) {
+            $q->where('is_graded', true)
+              ->whereHas('question', function($query) {
+                  $query->where('type', 'essay');
+              });
+        }])
+        ->orderBy('created_at', 'desc')
+        ->get();
+    
+    return view('guru.koreksi.list_jadwal', compact('schedules'));
+}
 
     /**
      * 2. Menampilkan daftar siswa & kalkulasi nilai murni terintegrasi
@@ -86,10 +98,15 @@ class KoreksiController extends Controller
      */
     public function storeWeight(Request $request, $schedule_id)
     {
+        // Validasi: weight_pg + weight_essay harus sama dengan 100
         $request->validate([
-            'weight_pg' => 'required|numeric|min:0|max:100',
+            'weight_pg'    => 'required|numeric|min:0|max:100',
             'weight_essay' => 'required|numeric|min:0|max:100',
         ]);
+
+        if (($request->weight_pg + $request->weight_essay) != 100) {
+            return redirect()->back()->withErrors(['weight_error' => 'Total bobot harus tepat 100%! (PG + Essay)']);
+        }
 
         $schedule = Schedule::findOrFail($schedule_id);
         $schedule->update([
@@ -101,7 +118,7 @@ class KoreksiController extends Controller
     }
 
     /**
-     * 4. Form periksa jawaban individu (Hanya Essay)
+     * 4. Form periksa jawaban individu (Menampilkan Seluruh Soal: PG & Essay)
      */
     public function show(Request $request, $user_id)
     {
@@ -113,21 +130,20 @@ class KoreksiController extends Controller
         $student = User::findOrFail($user_id);
         $schedule = Schedule::findOrFail($schedule_id);
 
-        // Ambil seluruh master soal tipe essay yang ada di mata pelajaran/subject jadwal ini
-        // Kita gunakan eager loading untuk menarik jawaban milik siswa bersangkutan (jika ada)
-        $essayQuestions = Question::where('subject_id', $schedule->subject_id)
-            ->where('type', 'essay')
+        // 🌟 PERBAIKAN: Hapus where('type', 'essay') agar PG juga ikut tampil
+        $questions = Question::where('schedule_id', $schedule_id)
             ->with(['studentAnswers' => function($query) use ($user_id, $schedule_id) {
                 $query->where('user_id', $user_id)
                       ->where('schedule_id', $schedule_id);
             }])
             ->get();
 
-        return view('guru.koreksi.periksa', compact('student', 'schedule', 'essayQuestions', 'user_id', 'schedule_id'));
+        // Variabel dikirim sebagai $questions sesuai dengan kebutuhan di Blade
+        return view('guru.koreksi.periksa', compact('student', 'schedule', 'questions', 'user_id', 'schedule_id'));
     }
 
     /**
-     * 5. Simpan hasil penilaian essay (Mendukung pembuatan record untuk soal kosong tanpa error database)
+     * 5. Simpan hasil penilaian (Mendukung PG & Essay)
      */
     public function update(Request $request, $student_id)
     {
@@ -138,7 +154,6 @@ class KoreksiController extends Controller
                 
                 // Pengecekan aman: Jika key mengandung kata 'new_', berarti ini soal kosong baru
                 if (is_string($inputKey) && strpos($inputKey, 'new_') !== false) {
-                    // Ambil ID master question asli di belakang kata 'new_'
                     $questionId = str_replace('new_', '', $inputKey);
                     
                     // Gunakan updateOrCreate untuk mencegah double rekap data kosong
@@ -149,17 +164,16 @@ class KoreksiController extends Controller
                             'question_id' => $questionId,
                         ],
                         [
-                            // 📢 FIX UTAMA: Jangan kirim null jika kolom DB diset NOT NULL. 
-                            // Kita ganti dengan string penanda strip atau teks informatif
+                            // Jika siswa benar-benar tidak menjawab (baik PG maupun Essay)
                             'answer'       => '-', 
-                            'score'        => 0, // Soal kosong mutlak bernilai 0
+                            'score'        => $score ?? 0,
                             'teacher_note' => $request->notes[$inputKey] ?? 'Jawaban kosong otomatis diberi nilai 0.',
                             'is_graded'    => true,
                             'is_finished'  => true
                         ]
                     );
                 } else {
-                    // Jika key berupa ID Integer murni (Berarti data jawaban lama siswa dari HP)
+                    // Jika key berupa ID Integer murni (Berarti jawaban ada di DB)
                     if (is_numeric($inputKey)) {
                         StudentAnswer::where('id', $inputKey)->update([
                             'score'        => $score,
@@ -174,6 +188,7 @@ class KoreksiController extends Controller
         return redirect()->route('guru.koreksi.index', $schedule_id)
                          ->with('success', 'Penilaian sukses disinkronkan dan disimpan!');
     }
+
     /**
      * 6. Export Nilai ke Excel
      */

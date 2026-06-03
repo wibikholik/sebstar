@@ -2,6 +2,153 @@
 
 @section('title', 'Kelola Pengguna')
 
+
+
+@section('content')
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
+        <div class="stat-info">
+            <h2>{{ $users->where('role', 'siswa')->count() }}</h2>
+            <p>TOTAL SISWA</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon-wrapper icon-guru"><i class="fas fa-chalkboard-teacher"></i></div>
+        <div class="stat-info">
+            <h2>{{ $users->where('role', 'guru')->count() }}</h2>
+            <p>TOTAL GURU</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon-wrapper icon-pengawas"><i class="fas fa-user-lock"></i></div>
+        <div class="stat-info">
+            <h2>{{ $users->where('role', 'pengawas')->count() }}</h2>
+            <p>TOTAL PENGAWAS</p>
+        </div>
+    </div>
+</div>
+
+<div class="content-box">
+    <div class="action-bar">
+        <h3><i class="fas fa-users-cog header-icon"></i> Manajemen Akun Pengguna</h3>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div class="search-wrapper">
+                <input type="text" class="search-input" placeholder="Cari nama / nomor...">
+            </div>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fas fa-user-plus"></i> Tambah Akun
+            </button>
+        </div>
+    </div>
+
+    <div class="import-panel">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 14px; font-weight: 700; color: #1e1e2f;">Import Pengguna Massal</span>
+            <span style="font-size: 12px; color: #64748b;">Tambah ratusan data siswa/guru menggunakan berkas Excel atau CSV.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <a href="{{ route('admin.users.download_template') }}" class="btn-download-template">
+                <i class="fas fa-file-download"></i> Unduh Template
+            </a>
+            <form action="{{ route('admin.users.import') }}" method="POST" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 10px; margin: 0;">
+                @csrf
+                <input type="file" name="file_excel" required class="file-input-custom">
+                <button type="submit" class="btn-process-import">
+                    <i class="fas fa-cloud-upload-alt"></i> Proses Import
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="tab-switcher">
+        <div class="tab-item {{ !request('role') ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index') }}'">Semua Pengguna</div>
+        <div class="tab-item {{ request('role') == 'siswa' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'siswa']) }}'">Siswa</div>
+        <div class="tab-item {{ request('role') == 'guru' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'guru']) }}'">Guru</div>
+        <div class="tab-item {{ request('role') == 'pengawas' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'pengawas']) }}'">Pengawas</div>
+    </div>
+
+    @if(session('success'))
+        <div style="background: #d4edda; color: #155724; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c3e6cb; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-check-circle"></i> {{ session('success') }}
+        </div>
+    @endif
+    @if(session('error'))
+        <div style="background: #fee2e2; color: #b91c1c; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #fecaca; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+        </div>
+    @endif
+
+    <div style="border: 1px solid #edf0f5; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.01);">
+        <table>
+            <thead>
+                <tr>
+                    <th>NIS / NIP</th>
+                    <th>Nama Lengkap</th>
+                    <th>Kelas / Mata Pelajaran</th>
+                    <th style="text-align: center;">Hak Akses</th>
+                    <th style="text-align: center;">Tindakan</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($users as $user)
+                <tr>
+                    <td style="color: #64748b; font-weight: 500; font-size: 13px;">
+                        @if($user->role == 'siswa')
+                            {{ $user->nis ?? '-' }}
+                        @elseif($user->role == 'guru')
+                            {{ $user->nip ?? '-' }}
+                        @else
+                            <span style="color: #cbd5e1;">-</span>
+                        @endif
+                    </td>
+                    <td style="font-weight: 600; color: #1e1e2f;">{{ $user->name }}</td>
+                    <td>
+                        @if($user->role == 'siswa')
+                            <span style="color: #3b82f6; font-weight: 500;"><i class="fas fa-school" style="font-size: 12px; margin-right: 4px;"></i> {{ $user->classroom->nama_kelas ?? 'Belum Set' }}</span>
+                        @elseif($user->role == 'guru')
+                            <span style="color: #10b981; font-weight: 500;"><i class="fas fa-book" style="font-size: 12px; margin-right: 4px;"></i> {{ $user->subject->nama_mapel ?? 'Belum Set' }}</span>
+                        @else
+                            <span style="color: #94a3b8; font-size: 13px;">Akses Penuh Sistem</span>
+                        @endif
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="badge-role badge-{{ $user->role }}">
+                            {{ $user->role }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick='openEditModal(@json($user))' class="btn-table-action btn-edit" title="Ubah Data">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" onclick="confirmDelete('{{ $user->id }}', '{{ $user->name }}')" class="btn-table-action btn-delete" title="Hapus Data">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 50px; color: #94a3b8;">
+                        <i class="fas fa-folder-open" style="font-size: 32px; display: block; margin-bottom: 10px; color: #cbd5e1;"></i>
+                        Data pengguna tidak ditemukan dalam database.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<form id="delete-form" method="POST" style="display: none;">
+    @csrf
+    @method('DELETE')
+</form>
+
+@include('admin.users.create')
+@include('admin.users.edit')
 <style>
     /* Background dengan Gradasi Merah-Putih Tegas + Efek Polkadot Grid Modern */
     body {
@@ -99,6 +246,85 @@
         display: flex !important;
         align-items: center !important;
         gap: 8px !important;
+    }
+
+    /* Panel Import Excel Kontainer Khusus */
+    .import-panel {
+        background: #fafafa !important;
+        border: 1px dashed #e2e8f0 !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        margin-bottom: 25px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 15px !important;
+    }
+
+    .btn-download-template {
+        background: #f1f5f9 !important;
+        color: #475569 !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 9px 18px !important;
+        border-radius: 20px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .btn-download-template:hover {
+        background: #e2e8f0 !important;
+        color: #1e293b !important;
+    }
+
+    .file-input-custom {
+        font-size: 13px !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+    }
+
+    .file-input-custom::-webkit-file-upload-button {
+        background: #0f172a !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 8px 16px !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        margin-right: 12px !important;
+        cursor: pointer !important;
+        transition: background 0.2s ease !important;
+    }
+
+    .file-input-custom::-webkit-file-upload-button:hover {
+        background: #1e293b !important;
+    }
+
+    .btn-process-import {
+        background: #b91c1c !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 9px 20px !important;
+        border-radius: 20px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        box-shadow: 0 4px 10px rgba(185, 28, 28, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .btn-process-import:hover {
+        background: #991b1b !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25) !important;
     }
 
     /* Input Search Elegan */
@@ -241,134 +467,6 @@
     .btn-table-action.btn-delete { color: #e74c3c !important; margin-left: 4px !important; }
     .btn-table-action.btn-delete:hover { border-color: #e74c3c !important; background: rgba(231, 76, 60, 0.05) !important; }
 </style>
-
-@section('content')
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon-wrapper icon-siswa"><i class="fas fa-user-graduate"></i></div>
-        <div class="stat-info">
-            <h2>{{ $users->where('role', 'siswa')->count() }}</h2>
-            <p>TOTAL SISWA</p>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon-wrapper icon-guru"><i class="fas fa-chalkboard-teacher"></i></div>
-        <div class="stat-info">
-            <h2>{{ $users->where('role', 'guru')->count() }}</h2>
-            <p>TOTAL GURU</p>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon-wrapper icon-pengawas"><i class="fas fa-user-lock"></i></div>
-        <div class="stat-info">
-            <h2>{{ $users->where('role', 'pengawas')->count() }}</h2>
-            <p>TOTAL PENGAWAS</p>
-        </div>
-    </div>
-</div>
-
-<div class="content-box">
-    <div class="action-bar">
-        <h3><i class="fas fa-users-cog header-icon"></i> Manajemen Akun Pengguna</h3>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <div class="search-wrapper">
-                <input type="text" class="search-input" placeholder="Cari nama / nomor...">
-            </div>
-            <button class="btn-add" onclick="openModal()">
-                <i class="fas fa-user-plus"></i> Tambah Akun
-            </button>
-        </div>
-    </div>
-
-    <div class="tab-switcher">
-        <div class="tab-item {{ !request('role') ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index') }}'">Semua Pengguna</div>
-        <div class="tab-item {{ request('role') == 'siswa' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'siswa']) }}'">Siswa</div>
-        <div class="tab-item {{ request('role') == 'guru' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'guru']) }}'">Guru</div>
-        <div class="tab-item {{ request('role') == 'pengawas' ? 'active' : '' }}" onclick="location.href='{{ route('admin.users.index', ['role' => 'pengawas']) }}'">Pengawas</div>
-    </div>
-
-    @if(session('success'))
-        <div style="background: #d4edda; color: #155724; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c3e6cb; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-check-circle"></i> {{ session('success') }}
-        </div>
-    @endif
-    @if(session('error'))
-        <div style="background: #fee2e2; color: #b91c1c; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #fecaca; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
-        </div>
-    @endif
-
-    <div style="border: 1px solid #edf0f5; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.01);">
-        <table>
-            <thead>
-                <tr>
-                    <th>NIS / NIP</th>
-                    <th>Nama Lengkap</th>
-                    <th>Kelas / Mata Pelajaran</th>
-                    <th style="text-align: center;">Hak Akses</th>
-                    <th style="text-align: center;">Tindakan</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($users as $user)
-                <tr>
-                    <td style="color: #64748b; font-weight: 500; font-size: 13px;">
-                        @if($user->role == 'siswa')
-                            {{ $user->nis ?? '-' }}
-                        @elseif($user->role == 'guru')
-                            {{ $user->nip ?? '-' }}
-                        @else
-                            <span style="color: #cbd5e1;">-</span>
-                        @endif
-                    </td>
-                    <td style="font-weight: 600; color: #1e1e2f;">{{ $user->name }}</td>
-                    <td>
-                        @if($user->role == 'siswa')
-                            <span style="color: #3b82f6; font-weight: 500;"><i class="fas fa-school" style="font-size: 12px; margin-right: 4px;"></i> {{ $user->classroom->nama_kelas ?? 'Belum Set' }}</span>
-                        @elseif($user->role == 'guru')
-                            <span style="color: #10b981; font-weight: 500;"><i class="fas fa-book" style="font-size: 12px; margin-right: 4px;"></i> {{ $user->subject->nama_mapel ?? 'Belum Set' }}</span>
-                        @else
-                            <span style="color: #94a3b8; font-size: 13px;">Akses Penuh Sistem</span>
-                        @endif
-                    </td>
-                    <td style="text-align: center;">
-                        <span class="badge-role badge-{{ $user->role }}">
-                            {{ $user->role }}
-                        </span>
-                    </td>
-                    <td style="text-align: center;">
-                        <button onclick='openEditModal(@json($user))' class="btn-table-action btn-edit" title="Ubah Data">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button type="button" onclick="confirmDelete('{{ $user->id }}', '{{ $user->name }}')" class="btn-table-action btn-delete" title="Hapus Data">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="5" style="text-align: center; padding: 50px; color: #94a3b8;">
-                        <i class="fas fa-folder-open" style="font-size: 32px; display: block; margin-bottom: 10px; color: #cbd5e1;"></i>
-                        Data pengguna tidak ditemukan dalam database.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<form id="delete-form" method="POST" style="display: none;">
-    @csrf
-    @method('DELETE')
-</form>
-
-@include('admin.users.create')
-@include('admin.users.edit')
-
 <script>
     function openModal() {
         document.getElementById("userModal").style.display = "block";

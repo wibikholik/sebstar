@@ -1,8 +1,10 @@
-<div class="navbar">
-    <div class="breadcrumb">
-        <strong>SMKN 1 Binong</strong> / @yield('title')
-    </div>
-    <div class="user-info">
-        Halo, <strong>{{ Auth::user()->name }}</strong> ({{ ucfirst(Auth::user()->role) }})
-    </div>
-</div>
+  <header class="header-content">
+            <div class="header-title">
+                <h1>@yield('title')</h1>
+                <p>Selamat datang di SEBSTAR</p>
+            </div>
+            <div class="user-info">
+                <span class="role">{{ auth()->user()->role }}</span>
+                <span class="date">{{ now()->translatedFormat('l, d F Y') }}</span>
+            </div>
+        </header>

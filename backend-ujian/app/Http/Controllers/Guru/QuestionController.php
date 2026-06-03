@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Question;
 use App\Models\Schedule;
+use App\Imports\QuestionsImport; // 🌟 Logic Import
+use Maatwebsite\Excel\Facades\Excel; // 🌟 Facade Excel
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +25,6 @@ class QuestionController extends Controller
         $questions = Question::where('schedule_id', $schedule_id)->latest()->get();
         $teacherId = Auth::id();
 
-        // Optimasi: Memastikan pencarian teacher_ids fleksibel terhadap format data
         $otherSchedules = Schedule::with(['classroom', 'subject'])
             ->where('id', '!=', $schedule_id)
             ->where('subject_id', $schedule->subject_id)
@@ -38,24 +39,58 @@ class QuestionController extends Controller
         return view('guru.questions.manage', compact('schedule', 'questions', 'otherSchedules'));
     }
 
+    // 🚀 FITUR: Import Soal via Excel
+    public function importExcel(Request $request, $schedule_id)
+    {
+        $request->validate([
+            'file_excel' => 'required|mimes:xlsx,xls,csv|max:5120',
+        ]);
+
+        try {
+            Excel::import(new QuestionsImport($schedule_id), $request->file('file_excel'));
+            return redirect()->back()->with('success', '✅ Soal berhasil diimpor!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', '⚠ Gagal import: ' . $e->getMessage());
+        }
+    }
+
+    // 📥 FITUR: Download Template Excel Soal
+    public function downloadTemplate()
+    {
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=template_soal_sebstar.csv",
+        ];
+
+        $columns = ['type', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_answer'];
+
+        $callback = function() use($columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fputcsv($file, ['pg', 'Contoh pertanyaan?', 'Opsi A', 'Opsi B', 'Opsi C', 'Opsi D', 'Opsi E', 'A']);
+            fputcsv($file, ['essay', 'Contoh soal essay?', '', '', '', '', '', '']);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
             'schedule_id'    => 'required|exists:schedules,id',
-            'subject_id'     => 'required',
             'type'           => 'required|in:pg,essay',
             'question_text'  => 'required',
             'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            // Validasi opsi wajib jika PG
-            'option_a'       => 'required_if:type,pg',
-            'option_b'       => 'required_if:type,pg',
-            'correct_answer_pg' => 'required_if:type,pg',
         ]);
 
         try {
             DB::beginTransaction();
+            $schedule = Schedule::findOrFail($request->schedule_id);
 
-            $data = $request->only(['subject_id', 'schedule_id', 'type', 'question_text']);
+            $data = $request->only(['type', 'question_text']);
+            $data['subject_id'] = $schedule->subject_id;
+            $data['schedule_id'] = $schedule->id;
             $data['user_id'] = Auth::id();
             $data['correct_answer'] = ($request->type == 'pg') ? $request->correct_answer_pg : $request->correct_answer_essay;
 
@@ -76,17 +111,19 @@ class QuestionController extends Controller
                              ->with('success', 'Soal berhasil ditambahkan!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
+            return back()->with('error', 'Gagal: ' . $e->getMessage());
         }
     }
 
+    // 🛠️ PERBAIKAN: Parameter $schedule_id dihapus karena route hanya mengirim $id
     public function update(Request $request, $id)
     {
         $question = Question::findOrFail($id);
         
         $request->validate([
-            'question_text'  => 'required',
             'type'           => 'required|in:pg,essay',
+            'question_text'  => 'required',
+            'question_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         $data = $request->only(['type', 'question_text']);
@@ -97,63 +134,44 @@ class QuestionController extends Controller
             $data['question_image'] = $request->file('question_image')->store('uploads/questions', 'public');
         }
 
-        // Logic reset/update opsi
         foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
             $data["option_$opt"] = ($request->type == 'pg') ? $request->{"option_$opt"} : null;
         }
 
         $question->update($data);
 
-        return redirect()->route('guru.questions.manage', $request->schedule_id)
+        // 🛠️ PERBAIKAN: Ambil schedule_id langsung dari model relasinya
+        return redirect()->route('guru.questions.manage', $question->schedule_id)
                          ->with('success', 'Soal berhasil diperbarui!');
     }
-    
 
-
-    /**
-     * Copy Soal dari Jadwal Sumber ke Jadwal Target
-     */
     public function copy(Request $request, $schedule_id)
     {
-        $request->validate([
-            'from_schedule_id' => 'required|exists:schedules,id'
-        ]);
+        $request->validate(['from_schedule_id' => 'required|exists:schedules,id']);
 
-        // Ambil soal dari jadwal sumber
         $sourceQuestions = Question::where('schedule_id', $request->from_schedule_id)->get();
-
-        if ($sourceQuestions->isEmpty()) {
-            return redirect()->back()->with('error', 'Jadwal sumber ternyata tidak memiliki soal.');
-        }
+        if ($sourceQuestions->isEmpty()) return back()->with('error', 'Jadwal sumber kosong.');
 
         $targetSchedule = Schedule::findOrFail($schedule_id);
 
-        // Duplikasi soal menggunakan replicate()
         foreach ($sourceQuestions as $q) {
-            $newQuestion = $q->replicate();
-            $newQuestion->schedule_id = $targetSchedule->id;
-            $newQuestion->subject_id = $targetSchedule->subject_id;
-            $newQuestion->user_id = Auth::id(); // Penanda siapa yang menyalin
-            $newQuestion->save();
+            $new = $q->replicate();
+            $new->schedule_id = $targetSchedule->id;
+            $new->subject_id = $targetSchedule->subject_id;
+            $new->user_id = Auth::id();
+            $new->save();
         }
 
-        return redirect()->back()->with('success', count($sourceQuestions) . ' soal berhasil disalin ke jadwal ini!');
+        return back()->with('success', count($sourceQuestions) . ' soal berhasil disalin!');
     }
 
-    /**
-     * Hapus Soal secara permanen
-     */
+    // 🛠️ PERBAIKAN: Parameter $schedule_id juga dihapus untuk hapus soal
     public function destroy($id)
     {
         $question = Question::findOrFail($id);
-
-        // Hapus file gambar dari storage jika ada
-        if ($question->question_image) {
-            Storage::disk('public')->delete($question->question_image);
-        }
-
+        if ($question->question_image) Storage::disk('public')->delete($question->question_image);
         $question->delete();
 
-        return redirect()->back()->with('success', 'Soal berhasil dihapus!');
+        return back()->with('success', 'Soal berhasil dihapus!');
     }
 }

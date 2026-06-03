@@ -21,21 +21,33 @@
             </div>
         </div>
 
-        {{-- Loop Berdasarkan Butir Soal Master, Bukan Berdasarkan Isi Jawaban Siswa --}}
-        @foreach($essayQuestions as $index => $question)
+        {{-- Loop Berdasarkan Semua Butir Soal Master (PG & Essay) --}}
+        @foreach($questions as $index => $question)
             @php
                 // Ambil record jawaban siswa untuk soal ini (jika ada)
                 $studentAnswer = $question->studentAnswers->first();
                 
                 // Jika siswa pernah mengisi, ambil ID jawabannya untuk key update, jika kosong gunakan string custom kombinasi
                 $inputKey = $studentAnswer ? $studentAnswer->id : 'new_' . $question->id;
+                
+                // Cek tipe soal
+                $isPG = $question->type === 'pg';
             @endphp
-        <div class="essay-card-premium" style="{{ !$studentAnswer ? 'border-left: 5px solid #cd0000 !important;' : '' }}">
-            {{-- Nomor Soal --}}
-            <div class="card-badge-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="question-number-tag">SOAL NOMOR {{ $index + 1 }}</span>
+        
+        <div class="essay-card-premium" style="{{ !$studentAnswer ? 'border-left: 5px solid #cd0000 !important;' : ($isPG ? 'border-left: 5px solid #3b82f6 !important;' : '') }}">
+            {{-- Nomor Soal & Badge Status --}}
+            <div class="card-badge-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="question-number-tag">SOAL NOMOR {{ $index + 1 }}</span>
+                    <span style="font-size: 10px; background: {{ $isPG ? '#eff6ff' : '#f8fafc' }}; color: {{ $isPG ? '#3b82f6' : '#475569' }}; padding: 3px 10px; border-radius: 12px; font-weight: 800; border: 1px solid {{ $isPG ? '#bfdbfe' : '#e2e8f0' }};">
+                        {{ strtoupper($question->type) }}
+                    </span>
+                </div>
+                
                 @if(!$studentAnswer)
-                    <span style="font-size: 10px; background: rgba(230, 57, 70, 0.15); color: #cd0000; padding: 3px 10px; border-radius: 12px; font-weight: 800;">KOSONG / TIDAK DIISI</span>
+                    <span style="font-size: 10px; background: rgba(230, 57, 70, 0.15); color: #cd0000; padding: 3px 10px; border-radius: 12px; font-weight: 800;">
+                        <i class="fas fa-exclamation-circle"></i> KOSONG / TIDAK DIISI
+                    </span>
                 @endif
             </div>
             
@@ -44,39 +56,96 @@
                 <div class="section-block-premium">
                     <label class="block-label-premium"><i class="fas fa-question-circle"></i> Pertanyaan:</label>
                     <div class="question-display-box">
+                        @if(!empty($question->question_image))
+                            <div style="margin-bottom: 15px;">
+                                <img src="{{ asset('storage/' . $question->question_image) }}" alt="Gambar Soal" style="max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            </div>
+                        @endif
                         {!! $question->question_text !!}
                     </div>
                 </div>
 
-                {{-- Blok Jawaban Siswa --}}
+                {{-- Blok Jawaban Siswa Sesuai Tipe --}}
                 <div class="section-block-premium">
-                    <label class="block-label-premium color-red-accent"><i class="fas fa-pen-alt"></i> Jawaban Siswa:</label>
-                    <div class="student-answer-box" style="{{ !$studentAnswer ? 'color: #a0aec0 !important; font-style: italic; background: #fafafa !important;' : '' }}">
-                        {{ $studentAnswer->answer ?? '(Siswa melepaskan nomor ini / tidak mengisi jawaban)' }}
-                    </div>
+                    <label class="block-label-premium {{ $isPG ? 'color-blue-accent' : 'color-red-accent' }}">
+                        <i class="{{ $isPG ? 'fas fa-check-square' : 'fas fa-pen-alt' }}"></i> Jawaban Siswa:
+                    </label>
+                    
+                    @if($isPG)
+                        @php
+                            $isCorrect = $studentAnswer && strtoupper($studentAnswer->answer) === strtoupper($question->correct_answer);
+                            $chosenOption = $studentAnswer ? strtolower($studentAnswer->answer) : null;
+                            $chosenText = $chosenOption && isset($question->{'option_'.$chosenOption}) ? $question->{'option_'.$chosenOption} : '';
+                        @endphp
+                        
+                        <div class="student-answer-box" style="border-width: 2px !important; {{ !$studentAnswer ? 'background: #fafafa !important; border-color: #e2e8f0 !important;' : ($isCorrect ? 'border-color: #10b981 !important; background: #ecfdf5 !important;' : 'border-color: #ef4444 !important; background: #fef2f2 !important;') }}">
+                            @if($studentAnswer)
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                                    <div>
+                                        <strong style="color: {{ $isCorrect ? '#065f46' : '#991b1b' }};">{{ strtoupper($studentAnswer->answer) }}.</strong> 
+                                        <span style="color: {{ $isCorrect ? '#065f46' : '#991b1b' }};">{{ $chosenText }}</span>
+                                    </div>
+                                    @if($isCorrect)
+                                        <span style="color: #10b981; font-weight: 800; font-size: 13px; background: #d1fae5; padding: 4px 10px; border-radius: 20px; white-space: nowrap;"><i class="fas fa-check"></i> BENAR</span>
+                                    @else
+                                        <span style="color: #ef4444; font-weight: 800; font-size: 13px; background: #fee2e2; padding: 4px 10px; border-radius: 20px; white-space: nowrap;"><i class="fas fa-times"></i> SALAH</span>
+                                    @endif
+                                </div>
+                                @if(!$isCorrect)
+                                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #fca5a5; font-size: 13px; color: #b91c1c;">
+                                        <strong>Kunci Jawaban yang Benar:</strong> {{ strtoupper($question->correct_answer) }}. {{ $question->{'option_'.strtolower($question->correct_answer)} ?? '' }}
+                                    </div>
+                                @endif
+                            @else
+                                <span style="color: #a0aec0; font-style: italic;">(Siswa tidak mengisi jawaban pada nomor ini)</span>
+                                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 13px; color: #475569;">
+                                    <strong>Kunci Jawaban:</strong> {{ strtoupper($question->correct_answer) }}
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        {{-- Tampilan Jawaban Essay --}}
+                        <div class="student-answer-box" style="{{ !$studentAnswer ? 'color: #a0aec0 !important; font-style: italic; background: #fafafa !important;' : '' }}">
+                            {{ $studentAnswer->answer ?? '(Siswa melepaskan nomor ini / tidak mengisi jawaban)' }}
+                        </div>
+                        
+                        {{-- Pedoman Jawaban Essay untuk Guru --}}
+                        @if(!empty($question->correct_answer))
+                            <div style="margin-top: 10px; padding: 12px 15px; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 0 8px 8px 0; font-size: 13px; color: #475569;">
+                                <strong style="color: #334155;"><i class="fas fa-lightbulb"></i> Pedoman Jawaban:</strong><br>
+                                {!! nl2br(e($question->correct_answer)) !!}
+                            </div>
+                        @endif
+                    @endif
                 </div>
 
                 {{-- Panel Penilaian (Skor & Feedback) --}}
                 <div class="assessment-panel-grid">
                     <div class="score-input-wrapper">
-                        <label class="panel-label-premium">Skor (0-100)</label>
+                        <label class="panel-label-premium">
+                            Skor (0-100)
+                            @if($isPG)
+                                <span style="display: block; font-size: 9px; color: #3b82f6; margin-top: 2px;">(AUTO SISTEM)</span>
+                            @endif
+                        </label>
                         <input type="number" 
                                name="scores[{{ $inputKey }}]" 
                                value="{{ $studentAnswer ? $studentAnswer->score : 0 }}" 
                                step="0.01" 
-                               required 
                                min="0" 
                                max="100"
                                placeholder="0"
                                class="input-score-premium"
-                               {{ !$studentAnswer ? 'readonly style=background:#edf2f7;color:#a0aec0;' : '' }}>
+                               {{-- Kunci form jika Pilihan Ganda ATAU Siswa tidak menjawab --}}
+                               {{ ($isPG || !$studentAnswer) ? 'readonly style=background:#edf2f7;color:#a0aec0;' : 'required' }}>
                     </div>
+                    
                     <div class="feedback-input-wrapper">
                         <label class="panel-label-premium">Catatan / Feedback Guru</label>
                         <textarea name="notes[{{ $inputKey }}]" 
-                                  placeholder="{{ !$studentAnswer ? 'Tidak perlu diisi karena lembar pengerjaan kosong.' : 'Tulis ringkasan masukan atau evaluasi pengerjaan siswa di sini...' }}" 
+                                  placeholder="{{ $isPG ? 'Otomatis diperiksa oleh sistem.' : (!$studentAnswer ? 'Tidak perlu diisi karena lembar pengerjaan kosong.' : 'Tulis ringkasan masukan atau evaluasi pengerjaan siswa di sini...') }}" 
                                   class="textarea-feedback-premium"
-                                  {{ !$studentAnswer ? 'readonly style=background:#edf2f7;' : '' }}>{{ $studentAnswer ? $studentAnswer->teacher_note : 'Jawaban kosong otomatis diberi nilai 0.' }}</textarea>
+                                  {{ ($isPG || !$studentAnswer) ? 'readonly style=background:#edf2f7;color:#94a3b8;' : '' }}>{{ $studentAnswer ? $studentAnswer->teacher_note : ($isPG ? '' : 'Jawaban kosong otomatis diberi nilai 0.') }}</textarea>
                     </div>
                 </div>
             </div>
@@ -141,7 +210,7 @@
         color: #1e1e2f !important;
     }
 
-    /* Kartu Per Butir Soal Essay */
+    /* Kartu Per Butir Soal */
     .essay-card-premium {
         background: #ffffff !important;
         border-radius: 16px !important;
@@ -183,6 +252,9 @@
     .block-label-premium.color-red-accent {
         color: #cd0000 !important;
     }
+    .block-label-premium.color-blue-accent {
+        color: #3b82f6 !important;
+    }
 
     /* Tampilan Kotak Pertanyaan & Jawaban */
     .question-display-box {
@@ -193,7 +265,7 @@
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
         line-height: 1.6 !important;
-        font-weight: 600;
+        font-weight: 500;
     }
     .student-answer-box {
         font-size: 15px !important;
@@ -253,8 +325,8 @@
         resize: vertical !important;
         font-family: inherit !important;
     }
-    .input-score-premium:focus,
-    .textarea-feedback-premium:focus {
+    .input-score-premium:focus:not([readonly]),
+    .textarea-feedback-premium:focus:not([readonly]) {
         border-color: #cd0000 !important;
         box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1) !important;
     }

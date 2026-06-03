@@ -193,7 +193,7 @@ export default function LoginScreen() {
             ]}
           >
             <Image
-              source={require('../../assets/images/LOGO.png')}
+              source={require('../../assets/images/icon.png')}
               style={styles.logo}
               resizeMode="contain"
             />

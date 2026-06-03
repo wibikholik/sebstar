@@ -3,110 +3,116 @@
 @section('title', 'Kelola Soal')
 
 @section('content')
-<div style="margin-bottom: 20px;">
-    <a href="{{ route('guru.schedules.index') }}" style="text-decoration: none; color: #64748b; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s;" onmouseover="this.style.color='#cd0000'" onmouseout="this.style.color='#64748b'">
-        <i class="fas fa-arrow-left"></i> Kembali ke Daftar Jadwal
-    </a>
-</div>
-
-{{-- Alert Notifikasi --}}
-@if(session('success'))
-    <div style="background: #ecfdf5; border-left: 5px solid #10b981; color: #065f46; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-        <i class="fas fa-check-circle" style="margin-right: 5px;"></i> {{ session('success') }}
-    </div>
-@endif
-
-@if(session('error'))
-    <div style="background: #fff5f5; border-left: 5px solid #cd0000; color: #950000; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-        <i class="fas fa-exclamation-circle" style="margin-right: 5px;"></i> {{ session('error') }}
-    </div>
-@endif
-
-{{-- Header Informasi Jadwal --}}
-<div class="content-box" style="background: #fff; padding: 25px; border-radius: 16px; border-left: 5px solid #cd0000; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); border-left: 5px solid #cd0000;">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+<div class="content-box" style="background: white; padding: 30px; border-radius: 16px; border: 1px solid #f1f5f9;">
+    
+    {{-- Header Informasi Jadwal & Navigasi --}}
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
         <div>
-            <span style="font-size: 11px; background: #fff5f5; color: #cd0000; padding: 5px 12px; border-radius: 20px; font-weight: 800; text-transform: uppercase; border: 1px solid rgba(205,0,0,0.15); letter-spacing: 0.5px;">
-                {{ $schedule->examType->name ?? 'Ujian' }}
+            <a href="{{ route('guru.schedules.index') }}" style="text-decoration: none; color: #64748b; font-size: 13px; font-weight: 600; transition: 0.2s;" onmouseover="this.style.color='#c91313'" onmouseout="this.style.color='#64748b'">← Kembali ke Daftar Jadwal</a>
+            <h3 style="margin: 5px 0 0 0; color: #0f172a; font-weight: 700; font-size: 22px;">{{ $schedule->subject->nama_mapel }}</h3>
+            <span style="font-size: 13px; color: #64748b; font-weight: 500;">
+                <i class="fas fa-school" style="margin-right: 4px;"></i> {{ $schedule->classroom->nama_kelas ?? 'Tanpa Kelas' }} | 
+                <i class="fas fa-layer-group" style="margin-right: 4px;"></i> {{ $schedule->examType->name ?? 'Tipe Belum Di-set' }}
             </span>
-            <h3 style="margin: 12px 0 6px; font-size: 24px; color: #1e1e2f; font-weight: 800;">{{ $schedule->subject->nama_mapel }}</h3>
-            <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 600;">Kelas: <strong style="color: #1e1e2f; font-weight: 700;">{{ $schedule->classroom->nama_kelas }}</strong></p>
         </div>
-        <div style="display: flex; gap: 12px;">
-            <button onclick="toggleModal('modalCopySoal')" class="btn-secondary-premium">
-                <i class="fas fa-copy"></i> Salin Soal
-            </button>
-            <button onclick="toggleModal('modalAddSoal')" class="btn-primary-premium">
-                <i class="fas fa-plus-circle"></i> Tambah Soal
-            </button>
+        <div style="display: flex; gap: 10px;">
+            <button type="button" onclick="toggleModal('modalCopySoal')" style="background: #1e293b; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">📋 Salin Soal</button>
+            <button type="button" onclick="toggleModal('modalAddSoal')" style="background: #c91313; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#a70f0f'" onmouseout="this.style.background='#c91313'">+ Tambah Soal</button>
         </div>
     </div>
-</div>
 
-{{-- Main Content Table --}}
-<div class="content-box" style="background: #fff; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05);">
-    <h4 style="margin: 0 0 20px 0; color: #1e1e2f; font-weight: 800; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-list-ul" style="color: #cd0000;"></i> Daftar Soal Sesi Ini <span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 20px; font-size: 12px;">{{ count($questions) }}</span>
-    </h4>
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="text-align: left; border-bottom: 2px solid #edf0f5; color: #475569; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <th style="padding: 12px; width: 50px; text-align: center;">NO</th>
-                    <th style="padding: 12px;">PERTANYAAN</th>
-                    <th style="padding: 12px; width: 100px;">TIPE</th>
-                    <th style="padding: 12px; width: 120px;">PEMBUAT</th>
-                    <th style="padding: 12px; text-align: center; width: 150px;">AKSI</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($questions as $index => $q)
-                <tr style="border-bottom: 1px solid #edf0f5; transition: 0.2s;" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 15px; color: #64748b; font-weight: 700; text-align: center; font-size: 13px;">{{ $index + 1 }}</td>
-                    <td style="padding: 15px;">
-                        <div style="font-weight: 600; color: #1e1e2f; font-size: 14px; line-height: 1.5;">{{ Str::limit(strip_tags($q->question_text), 100) }}</div>
-                        @if($q->question_image) 
-                            <small style="color: #cd0000; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; background: #fff5f5; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
-                                <i class="fas fa-image"></i> Ada Gambar
-                            </small> 
+    {{-- Panel Import Soal via Excel --}}
+    <div style="background: #fafafa; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 14px; font-weight: 700; color: #0f172a;">Import Soal via Excel / CSV</span>
+            <span style="font-size: 12px; color: #64748b;">Aturan template: Gunakan tipe <b>pg</b> (isi opsi a-e & correct_answer) atau <b>essay</b> (kosongkan opsi).</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <a href="{{ route('guru.questions.download_template') }}" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;">
+                <i class="fas fa-file-download"></i> Unduh Template Soal
+            </a>
+            
+            <form action="{{ route('guru.questions.import', $schedule->id) }}" method="POST" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 12px; margin: 0;">
+                @csrf
+                <input type="file" name="file_excel" required style="font-size: 13px; color: #64748b; cursor: pointer;">
+                <button type="submit" style="background: #c91313; color: #ffffff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; box-shadow: 0 4px 10px rgba(201, 19, 19, 0.15);">
+                    🚀 Proses Import Soal
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {{-- Alert Notifikasi --}}
+    @if(session('success'))
+        <div style="background: #dcfce7; color: #15803d; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 500;">
+            <i class="fas fa-check-circle"></i> {{ session('success') }}
+        </div>
+    @endif
+    
+    @if(session('error'))
+        <div style="background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 500;">
+            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+        </div>
+    @endif
+
+    {{-- List Bertumpuk Kumpulan Butir Soal --}}
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        @forelse($questions as $index => $q)
+        <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; background: #ffffff; transition: 0.3s;" onmouseover="this.style.borderColor='#cbd5e1'" onmouseout="this.style.borderColor='#e2e8f0'">
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
+                <span style="font-weight: 700; color: #64748b; font-size: 12px; letter-spacing: 0.5px;">
+                    NO. {{ $index + 1 }} ({{ strtoupper($q->type) }}) 
+                    <span style="margin-left: 8px; font-weight: 500; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px;">
+                        Pembuat: {{ $q->user_id == auth()->id() ? 'Saya' : 'Admin/Lain' }}
+                    </span>
+                </span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick='openEditModal({!! $q->toJson() !!})' style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: #475569; transition: 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">✏️ Edit</button>
+                    
+                    <form action="{{ route('guru.questions.destroy', $q->id) }}" method="POST" style="display:inline;">
+                        @csrf @method('DELETE')
+                        <button type="submit" onclick="return confirm('Apakah Anda yakin ingin menghapus soal ini?')" style="background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.2s;" onmouseover="this.style.background='#fca5a5'" onmouseout="this.style.background='#fee2e2'">🗑️</button>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Media Gambar Soal (Jika Ada) --}}
+            @if(!empty($q->question_image) && trim($q->question_image) != '')
+                <div style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; display: inline-block; border: 1px solid #e2e8f0;">
+                    <img src="{{ asset('storage/' . $q->question_image) }}" 
+                         alt="Gambar Soal SEBSTAR" 
+                         style="max-width: 100%; max-height: 250px; border-radius: 6px; display: block; object-fit: contain;">
+                </div>
+            @endif
+
+            {{-- Isi Teks Pertanyaan --}}
+            <p style="font-size: 16px; color: #1e293b; line-height: 1.6; margin-bottom: 15px; font-weight: 500;">{!! nl2br(e($q->question_text)) !!}</p>
+
+            {{-- Opsi / Jawaban Singkat Sesuai Tipe Soal --}}
+            @if($q->type == 'pg')
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    @foreach(['a','b','c','d','e'] as $o)
+                        @if(!empty($q->{'option_'.$o}))
+                            <div style="padding: 12px 16px; border-radius: 8px; border: 1px solid {{ strtoupper($q->correct_answer) == strtoupper($o) ? '#bbf7d0' : '#e2e8f0' }}; background: {{ strtoupper($q->correct_answer) == strtoupper($o) ? '#f0fdf4' : 'white' }}; font-size: 14px; color: #334155;">
+                                <strong style="color: {{ strtoupper($q->correct_answer) == strtoupper($o) ? '#16a34a' : '#64748b' }};">{{ strtoupper($o) }}.</strong> {{ $q->{'option_'.$o} }}
+                            </div>
                         @endif
-                    </td>
-                    <td style="padding: 15px;">
-                        <span style="text-transform: uppercase; font-size: 10px; font-weight: 800; background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                            {{ $q->type }}
-                        </span>
-                    </td>
-                    <td style="padding: 15px;">
-                        <span style="font-size: 12px; color: #475569; font-weight: 600;">
-                            {{ $q->user_id == auth()->id() ? 'Saya' : 'Admin/Lain' }}
-                        </span>
-                    </td>
-                    <td style="padding: 15px; text-align: center;">
-                        <div style="display: flex; justify-content: center; gap: 15px;">
-                            <button type="button" onclick='openEditModal({!! $q->toJson() !!})' style="color: #3b82f6; border: none; background: none; font-weight: 700; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; padding: 0;">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <form action="{{ route('guru.questions.destroy', $q->id) }}" method="POST" onsubmit="return confirm('Hapus soal ini?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" style="background: none; border: none; color: #cd0000; font-weight: 700; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; padding: 0;">
-                                    <i class="fas fa-trash-alt"></i> Hapus
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="5" style="text-align: center; padding: 60px;">
-                        <div style="color: #94a3b8; font-size: 14px; font-weight: 600;">
-                            <i class="fas fa-folder-open" style="font-size: 32px; color: #cbd5e1; display: block; margin-bottom: 10px;"></i>
-                            Belum ada soal untuk jadwal ini.
-                        </div>
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
+                    @endforeach
+                </div>
+            @else
+                <div style="padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #c91313; font-size: 14px; color: #334155;">
+                    <strong style="color: #c91313;"><i class="fas fa-info-circle"></i> Pedoman Jawaban:</strong>
+                    <div style="margin-top: 5px; line-height: 1.5;">{!! nl2br(e($q->correct_answer)) !!}</div>
+                </div>
+            @endif
+        </div>
+        @empty
+            <div style="text-align: center; padding: 50px; color: #64748b; border: 2px dashed #e2e8f0; border-radius: 12px; background: #fafafa;">
+                <i class="fas fa-folder-open" style="font-size: 36px; color: #cbd5e1; display: block; margin-bottom: 10px;"></i>
+                Belum ada butir soal dalam jadwal ujian ini.
+            </div>
+        @endforelse
     </div>
 </div>
 
@@ -195,7 +201,9 @@
 
     function openEditModal(data) {
         const form = document.getElementById('formEditSoal');
-        form.action = `/guru/questions/${data.id}`;
+        if(form) {
+            form.action = `/guru/questions/${data.id}`;
+        }
 
         document.getElementById('edit_type').value = data.type;
         document.getElementById('edit_question_text').value = data.question_text;
@@ -203,16 +211,16 @@
         if (data.type === 'pg') {
             document.getElementById('editPgContainer').style.display = 'block';
             document.getElementById('editEssayContainer').style.display = 'none';
-            document.getElementById('edit_option_a').value = data.option_a;
-            document.getElementById('edit_option_b').value = data.option_b;
-            document.getElementById('edit_option_c').value = data.option_c;
-            document.getElementById('edit_option_d').value = data.option_d;
-            document.getElementById('edit_option_e').value = data.option_e;
-            document.getElementById('edit_correct_answer_pg').value = data.correct_answer;
+            document.getElementById('edit_option_a').value = data.option_a || '';
+            document.getElementById('edit_option_b').value = data.option_b || '';
+            document.getElementById('edit_option_c').value = data.option_c || '';
+            document.getElementById('edit_option_d').value = data.option_d || '';
+            document.getElementById('edit_option_e').value = data.option_e || '';
+            document.getElementById('edit_correct_answer_pg').value = data.correct_answer ? data.correct_answer.toUpperCase() : 'A';
         } else {
             document.getElementById('editPgContainer').style.display = 'none';
             document.getElementById('editEssayContainer').style.display = 'block';
-            document.getElementById('edit_correct_answer_essay').value = data.correct_answer;
+            document.getElementById('edit_correct_answer_essay').value = data.correct_answer || '';
         }
         toggleModal('modalEditSoal');
     }
@@ -324,50 +332,6 @@
     .form-input-premium:focus {
         border-color: #cd0000 !important;
         box-shadow: 0 0 0 3px rgba(205, 0, 0, 0.1) !important;
-    }
-
-    /* Tombol Utama Premium (Merah Gradasi) */
-    .btn-primary-premium {
-        background: linear-gradient(135deg, #cd0000 0%, #950000 100%) !important;
-        color: #fff !important;
-        border: none !important;
-        padding: 12px 24px !important;
-        border-radius: 30px !important;
-        font-weight: 700 !important;
-        font-size: 13px !important;
-        cursor: pointer !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        box-shadow: 0 5px 15px rgba(205, 0, 0, 0.2) !important;
-        transition: 0.2s ease !important;
-    }
-
-    .btn-primary-premium:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 8px 20px rgba(205, 0, 0, 0.3) !important;
-        filter: brightness(1.1);
-    }
-
-    /* Tombol Sekunder Premium (Slate Gelap) */
-    .btn-secondary-premium {
-        background: #1e293b !important;
-        color: #fff !important;
-        border: none !important;
-        padding: 12px 24px !important;
-        border-radius: 30px !important;
-        font-weight: 700 !important;
-        font-size: 13px !important;
-        cursor: pointer !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        transition: 0.2s ease !important;
-    }
-
-    .btn-secondary-premium:hover {
-        background: #0f172a !important;
-        transform: translateY(-1px) !important;
     }
 
     /* Tombol Aksi di Modal */
