@@ -11,7 +11,8 @@ import {
   Modal, 
   TextInput, 
   KeyboardAvoidingView, 
-  Platform 
+  Platform,
+  SafeAreaView
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -137,7 +138,7 @@ export default function DashboardScreen() {
 
   const handleVerifyToken = async () => {
     if (!tokenInput) {
-      bukaAlertKustom("Validasi Gagal", "Silahkan masukkan kode token ujian terlebih dahulu!", "info");
+      bukaAlertKustom("Validasi Gagal", "Silakan masukkan kode token ujian terlebih dahulu!", "info");
       return;
     }
     
@@ -157,29 +158,20 @@ export default function DashboardScreen() {
     }
   };
 
-  // RENDER SEAMLESS PROFILE HEADER INSIDE FLATLIST
-  const renderHeaderComponent = () => (
-    <View style={styles.profileSection}>
-      <View style={styles.profileLeft}>
-        <Text style={styles.welcomeText}>Selamat Datang</Text>
-        <Text style={styles.userNameText}>{user?.name ?? 'Siswa Ujian'}</Text>
-        <View style={styles.classRow}>
-          <Ionicons name="school-outline" size={14} color="#64748b" />
-          <Text style={styles.classText}>{user?.classroom?.nama_kelas ?? 'XII RPL'}</Text>
-        </View>
+  const renderEmptyList = () => (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconCircle}>
+        <Ionicons name="file-tray-outline" size={40} color="#94a3b8" />
       </View>
-      
-      <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutIconButton} activeOpacity={0.6}>
-        <Ionicons name="log-out-outline" size={20} color="#c91313" />
-      </TouchableOpacity>
+      <Text style={styles.emptyTitle}>Belum Ada Jadwal</Text>
+      <Text style={styles.emptySubtitle}>Jadwal ujian aktif atau riwayat pengerjaan Anda akan muncul di sini.</Text>
     </View>
   );
 
-  const renderEmptyList = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="file-tray-outline" size={48} color="#94a3b8" />
-      <Text style={styles.emptyTitle}>Belum ada jadwal ujian</Text>
-      <Text style={styles.emptySubtitle}>Jadwal aktif atau riwayat ujian Anda akan terdaftar di sini.</Text>
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
+      <Text style={styles.listHeaderTitle}>Daftar Ujian Anda</Text>
+      <Text style={styles.listHeaderSubtitle}>Pilih ujian yang tersedia untuk mulai mengerjakan</Text>
     </View>
   );
 
@@ -187,20 +179,17 @@ export default function DashboardScreen() {
     const isFinished = item.is_finished;
     const isActive = item.status === 'aktif' && !isFinished;
     const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#64748b');
-    const badgeBg = isFinished ? '#f0fdf4' : (isActive ? '#fef2f2' : '#f8fafc');
+    const badgeBg = isFinished ? '#f0fdf4' : (isActive ? '#fff1f2' : '#f1f5f9');
 
     return (
-      <View style={[styles.examCard, isActive && styles.examCardActive]}>
+      <View style={[styles.card, isActive && styles.cardActive]}>
         <View style={styles.cardMainInfo}>
-          <View style={{ flex: 1, paddingRight: 8 }}>
-            <Text style={[styles.examBadgeText, { color: themeColor }]}>
-              {item.exam_type?.name ?? 'UJIAN'}
-            </Text>
+          <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.subjectName} numberOfLines={2}>
               {item.subject?.nama_mapel ?? 'Mata Pelajaran'}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: badgeBg, borderColor: themeColor + '25' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
             <Text style={[styles.statusBadgeText, { color: themeColor }]}>
               {isFinished ? 'SELESAI' : (item.status ? item.status.toUpperCase() : 'NONAKTIF')}
             </Text>
@@ -209,11 +198,15 @@ export default function DashboardScreen() {
 
         <View style={styles.cardDetailsRow}>
           <View style={styles.detailItem}>
-            <Ionicons name="time-outline" size={14} color="#94a3b8" />
+            <View style={styles.detailIconBox}>
+               <Ionicons name="time" size={14} color="#64748b" />
+            </View>
             <Text style={styles.detailText}>{item.durasi} Menit</Text>
           </View>
           <View style={styles.detailItem}>
-            <Ionicons name="calendar-outline" size={14} color="#94a3b8" />
+            <View style={styles.detailIconBox}>
+               <Ionicons name="calendar" size={14} color="#64748b" />
+            </View>
             <Text style={styles.detailText}>{formatTanggal(item.tanggal_ujian)}</Text>
           </View>
         </View>
@@ -240,7 +233,7 @@ export default function DashboardScreen() {
             {isFinished ? 'LIHAT HASIL' : (isActive ? 'MASUK UJIAN' : 'BELUM AKTIF')}
           </Text>
           {(isActive || isFinished) && (
-            <Ionicons name="arrow-forward" size={14} color="#fff" />
+            <Ionicons name="chevron-forward" size={16} color="#fff" />
           )}
         </TouchableOpacity>
       </View>
@@ -248,21 +241,37 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#c91313" />
       
+      {/* HEADER KOTAK TEGAS SEJAJAR DENGAN KERJAKAN.TSX */}
+      <View style={styles.header}>
+        <View style={styles.headerProfile}>
+          <View style={styles.avatarCircle}>
+            <Ionicons name="person" size={22} color="#c91313" />
+          </View>
+          <View>
+            <Text style={styles.welcomeText}>Selamat Datang,</Text>
+            <Text style={styles.userNameText}>{user?.name ?? 'Siswa Ujian'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutIconButton}>
+          <Ionicons name="log-out-outline" size={26} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.body}>
         {loading && !refreshing ? (
           <View style={styles.center}>
-            <ActivityIndicator size="small" color={primaryRed} />
+            <ActivityIndicator size="large" color={primaryRed} />
           </View>
         ) : (
           <FlatList
             data={jadwal}
             renderItem={renderJadwal}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 30 }}
-            ListHeaderComponent={renderHeaderComponent}
+            contentContainerStyle={styles.scrollContainer}
+            ListHeaderComponent={jadwal.length > 0 ? renderListHeader : null}
             ListEmptyComponent={renderEmptyList}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -272,7 +281,7 @@ export default function DashboardScreen() {
         )}
       </View>
 
-      {/* MODAL TOKEN INPUT (MODERN FLAT STYLE) */}
+      {/* MODAL TOKEN INPUT */}
       {modalVisible && (
         <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
@@ -280,13 +289,13 @@ export default function DashboardScreen() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Verifikasi Token</Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
-                  <Ionicons name="close" size={18} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#64748b" />
                 </TouchableOpacity>
               </View>
               
               <Text style={styles.modalSubTitle}>
-                Silahkan masukkan kode token ujian untuk mata pelajaran:{"\n"}
-                <Text style={{fontWeight: '700', color: '#0f172a'}}>{selectedExam?.subject?.nama_mapel}</Text>
+                Silakan masukkan token ujian untuk:{"\n"}
+                <Text style={{fontWeight: '800', color: '#1e293b'}}>{selectedExam?.subject?.nama_mapel}</Text>
               </Text>
 
               <View style={styles.tokenWrapper}>
@@ -313,7 +322,7 @@ export default function DashboardScreen() {
         </Modal>
       )}
 
-      {/* CUSTOM MODAL ALERT (MODERN FLAT STYLE) */}
+      {/* CUSTOM MODAL ALERT */}
       {customAlert.visible && (
         <Modal animationType="fade" transparent={true} visible={customAlert.visible}>
           <View style={styles.modalOverlay}>
@@ -321,7 +330,7 @@ export default function DashboardScreen() {
               <View style={[styles.alertIconWrapper, { backgroundColor: customAlert.type === 'konfirmasi' ? '#fef2f2' : '#f8fafc' }]}>
                 <Ionicons 
                   name={customAlert.type === 'konfirmasi' ? "log-out" : "information-circle"} 
-                  size={24} 
+                  size={28} 
                   color={customAlert.type === 'konfirmasi' ? primaryRed : '#64748b'} 
                 />
               </View>
@@ -357,87 +366,99 @@ export default function DashboardScreen() {
         </Modal>
       )}
 
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 200 },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   body: { flex: 1 }, 
   
-  // SEAMLESS INLINE PROFILE HEADER
-  profileSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // HEADER KOTAK TEGAS SEJAJAR DENGAN KERJAKAN.TSX (TANPA BORDER RADIUS KELENGKUNGAN)
+  header: { 
+    backgroundColor: '#c91313', 
+    height: 75,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 10 : 0,
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
     alignItems: 'center',
-    paddingTop: Platform.OS === 'web' ? 20 : 50,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
-    marginBottom: 20,
+    zIndex: 10
   },
-  profileLeft: { flex: 1 },
-  welcomeText: { fontSize: 11, color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  userNameText: { fontSize: 20, fontWeight: '700', color: '#0f172a', marginTop: 2 },
-  classRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  classText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
-  logoutIconButton: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#fee2e2', backgroundColor: '#fff5f5' },
+  headerProfile: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  avatarCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' },
+  welcomeText: { color: '#fca5a5', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  userNameText: { color: '#ffffff', fontSize: 16, fontWeight: '800', marginTop: 2 },
+  logoutIconButton: { padding: 5, width: 35 },
+
+  // SCROLL CONTAINER
+  scrollContainer: { padding: 20, paddingBottom: 50 },
+  listHeader: { marginBottom: 15 },
+  listHeaderTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
+  listHeaderSubtitle: { fontSize: 12, color: '#64748b', marginTop: 2 },
+
+  // KARTU UJIAN PREMIUM (SAMA SEPERTI CARD SOAL)
+  card: { 
+    backgroundColor: '#fff', 
+    padding: 20, 
+    borderRadius: 20, 
+    elevation: 3, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 3, 
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#f1f5f9'
+  },
+  cardActive: { 
+    borderColor: '#fca5a5',
+    backgroundColor: '#fffdfd',
+    borderLeftWidth: 4,
+    borderLeftColor: '#c91313'
+  },
+  cardMainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
+  subjectName: { fontSize: 17, fontWeight: '700', color: '#1e293b', lineHeight: 24 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  statusBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  
+  cardDetailsRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
+  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailIconBox: { backgroundColor: '#f1f5f9', padding: 6, borderRadius: 8 },
+  detailText: { fontSize: 13, color: '#475569', fontWeight: '600' },
+  
+  actionButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 14, borderRadius: 14, gap: 8 },
+  actionButtonText: { fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
+  btnActive: { backgroundColor: '#c91313' },
+  btnFinished: { backgroundColor: '#1e293b' },
+  btnInactive: { backgroundColor: '#f1f5f9' },
 
   // EMPTY STATE
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#334155', marginTop: 10 },
-  emptySubtitle: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 2, paddingHorizontal: 20 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 80 },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
+  emptySubtitle: { fontSize: 13, color: '#64748b', textAlign: 'center', marginTop: 6, paddingHorizontal: 30, lineHeight: 20 },
 
-  // CRISP ULTRA-MODERN EXAM CARDS
-  examCard: { 
-    backgroundColor: '#ffffff', 
-    padding: 16, 
-    borderRadius: 12, 
-    marginBottom: 12, 
-    borderWidth: 1, 
-    borderColor: '#e2e8f0' 
-  },
-  examCardActive: { 
-    borderColor: '#c91313',
-    backgroundColor: '#fffdfd'
-  },
-  cardMainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  examBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
-  subjectName: { fontSize: 16, fontWeight: '600', color: '#0f172a', lineHeight: 22 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
-  statusBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  // MODAL & ALERT (Rounded 20 seperti card soal)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', backgroundColor: '#ffffff', borderRadius: 20, padding: 25, elevation: 10 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
+  modalSubTitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 22 },
+  closeBtn: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 10 },
   
-  cardDetailsRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  detailText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
-  
-  actionButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 8, gap: 6 },
-  actionButtonText: { fontWeight: '600', fontSize: 13, letterSpacing: 0.2 },
-  btnActive: { backgroundColor: '#c91313' },
-  btnFinished: { backgroundColor: '#0f172a' },
-  btnInactive: { backgroundColor: '#f1f5f9' },
-  
-  // MODAL TOKEN OVERLAYS (FLAT & MODERN)
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: Platform.OS === 'web' ? '380px' : '100%', backgroundColor: '#ffffff', borderRadius: 12, padding: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  modalSubTitle: { fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 18 },
-  closeBtn: { backgroundColor: '#f1f5f9', padding: 6, borderRadius: 6 },
-  
-  tokenWrapper: { backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-  tokenInput: { padding: 12, fontSize: 22, fontWeight: '700', textAlign: 'center', letterSpacing: 6, color: '#c91313' },
-  modalBtn: { backgroundColor: '#c91313', padding: 14, borderRadius: 8, alignItems: 'center' },
-  modalBtnText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
+  tokenWrapper: { backgroundColor: '#f8fafc', borderRadius: 15, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 },
+  tokenInput: { padding: 15, fontSize: 24, fontWeight: '800', textAlign: 'center', letterSpacing: 8, color: '#c91313' },
+  modalBtn: { backgroundColor: '#c91313', padding: 15, borderRadius: 15, alignItems: 'center' },
+  modalBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14, letterSpacing: 0.5 },
 
-  // STYLES CUSTOM ALERT MODAL
-  customAlertCard: { width: Platform.OS === 'web' ? '340px' : '90%', backgroundColor: '#ffffff', padding: 20, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  alertIconWrapper: { padding: 10, borderRadius: 50, marginBottom: 12 },
-  customAlertTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 6, textAlign: 'center' },
-  customAlertMessage: { fontSize: 13, color: '#64748b', fontWeight: '500', marginBottom: 20, textAlign: 'center', lineHeight: 18 },
-  alertConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  alertConfirmText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
-  alertCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#f1f5f9' },
-  alertCancelText: { color: '#475569', fontWeight: '600', fontSize: 14 }
+  customAlertCard: { width: '90%', backgroundColor: '#ffffff', padding: 25, borderRadius: 20, alignItems: 'center', elevation: 10 },
+  alertIconWrapper: { padding: 12, borderRadius: 50, marginBottom: 15 },
+  customAlertTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 8, textAlign: 'center' },
+  customAlertMessage: { fontSize: 14, color: '#64748b', fontWeight: '500', marginBottom: 25, textAlign: 'center', lineHeight: 20 },
+  alertConfirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  alertConfirmText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+  alertCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#f1f5f9' },
+  alertCancelText: { color: '#475569', fontWeight: '800', fontSize: 14 }
 });

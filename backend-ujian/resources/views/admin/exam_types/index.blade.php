@@ -52,6 +52,7 @@
     {{-- Header --}}
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 20px; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 15px;">
+            <div>
                 <h3 style="margin: 0; color: #1e1e2f; font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-tags" style="color: #cd0000;"></i> Kategori & Tipe Ujian
                 </h3>
@@ -63,10 +64,17 @@
         </button>
     </div>
 
-    {{-- Alert --}}
+    {{-- Alert Success --}}
     @if(session('success'))
         <div style="background: rgba(46, 204, 113, 0.1); border-left: 4px solid #2ecc71; color: #27ae60; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-weight: 600; font-size: 13px;">
             ✓ {{ session('success') }}
+        </div>
+    @endif
+
+    {{-- Alert Error / Gagal Proteksi Constraint --}}
+    @if(session('error'))
+        <div style="background: rgba(231, 76, 60, 0.1); border-left: 4px solid #e74c3c; color: #c0392b; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-weight: 600; font-size: 13px;">
+            ⚠️ {{ session('error') }}
         </div>
     @endif
 
@@ -106,17 +114,22 @@
                             <button type="button" onclick='openEditTypeModal(@json($type))' style="background: #fafafa; border: 1px solid #cbd5e1; padding: 7px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: #475569;">
                                 ✏️ Edit
                             </button>
-                            <form action="{{ route('admin.exam-types.destroy', $type->id) }}" method="POST" style="display:inline;">
-                                @csrf @method('DELETE')
-                                <button type="submit" onclick="return confirm('Hapus tipe ini?')" style="background: rgba(231, 76, 60, 0.08); border: 1px solid rgba(231, 76, 60, 0.2); padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;">
-                                    🗑️
+                            
+                            {{-- Perbaikan Form Action Menggunakan Penulisan URL Dinamis Sinkron --}}
+                            <form action="{{ url('admin/exam-types/' . $type->id) }}" method="POST" style="display:inline;">
+                                @csrf 
+                                @method('DELETE')
+                                <button type="submit" onclick="return confirm('Apakah Anda yakin ingin menghapus tipe ujian ini?')" style="background: rgba(231, 76, 60, 0.08); border: 1px solid rgba(231, 76, 60, 0.2); padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; color: #e74c3c;">
+                                    🗑️ Hapus
                                 </button>
                             </form>
                         </div>
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="3" style="text-align: center; padding: 50px 20px; color: #6a6a7a; font-weight: 600;">Belum ada data tipe ujian.</td></tr>
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 50px 20px; color: #6a6a7a; font-weight: 600;">Belum ada data tipe ujian.</td>
+                </tr>
                 @endforelse
             </tbody>
         </table>

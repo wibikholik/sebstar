@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef
-} from 'react';
-
+import React, { useState } from 'react';
 import {
   View,
   TextInput,
@@ -12,27 +7,20 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   StatusBar,
   Image,
-  Animated,
+  ScrollView,
+  KeyboardAvoidingView
 } from 'react-native';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-
-import {
-  User,
-  Lock,
-  LogIn,
-} from 'lucide-react-native';
+import { User, Lock, LogIn, Info } from 'lucide-react-native';
 
 import api from '../../src/api/axiosConfig';
 
 export default function LoginScreen() {
-
   const [nis, setNis] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,39 +30,14 @@ export default function LoginScreen() {
 
   const router = useRouter();
 
-  // FLOATING LOGO ANIMATION
-  const floatAnim = useRef(
-    new Animated.Value(0)
-  ).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 2000,
-          useNativeDriver: Platform.OS !== 'web', // Matikan di web jika ada kendala kompatibilitas
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ])
-    ).start();
-  }, []);
-
-  // FUNGSI UNTUK MENAMPILKAN ALERT YANG AMAN DI WEB DAN HP
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
-      // Di browser web, Alert bawaan react-native kadang tidak muncul di sebagian setup. gunakan alert bawaan browser.
       alert(`${title}\n\n${message}`);
     } else {
       Alert.alert(title, message);
     }
   };
 
-  // HANDLER LOGIN CROSS-PLATFORM (WEB & MOBILE APP)
   const handleLogin = async () => {
     if (!nis || !password) {
       showAlert('Peringatan', 'NIS dan Password harus diisi');
@@ -84,14 +47,9 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const response = await api.post('/login', {
-        nis,
-        password,
-      });
-
+      const response = await api.post('/login', { nis, password });
       const token = response.data.access_token;
       
-      // Mengamankan penyimpanan token untuk web dan mobile
       if (Platform.OS === 'web') {
         localStorage.setItem('userToken', token);
       } else {
@@ -101,43 +59,11 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
 
     } catch (error: any) {
-      // Mengubah seluruh log objek error menjadi string huruf kecil agar mudah disaring lintas platform
-      const errorString = JSON.stringify(error).toLowerCase();
-      const errorMessageFromServer = (error.response?.data?.message || error.response?.data?.error || '').toLowerCase();
       const statusCode = error.response?.status;
-
-      console.log('--- LOG DEBUG LOGIN ---');
-      console.log('Status Code:', statusCode);
-      console.log('Response Data:', error.response?.data);
-      console.log('Error Message Object:', error.message);
-
-      // KONDISI 1: Terdeteksi validasi gagal dari kode status HTTP (Umum di HP & Web normal)
       if (statusCode === 401 || statusCode === 403 || statusCode === 422) {
-        showAlert(
-          'Login Gagal',
-          'NIS atau Password yang kamu masukkan salah. Silakan periksa kembali data kamu.'
-        );
-      } 
-      // KONDISI 2: Deteksi kata kunci sensitif jika browser web menyembunyikan status code ke "Network Error"
-      else if (
-        errorString.includes('forbidden') || 
-        errorString.includes('unauthorized') || 
-        errorString.includes('401') || 
-        errorString.includes('403') ||
-        errorMessageFromServer.includes('forbidden') ||
-        errorMessageFromServer.includes('unauthorized')
-      ) {
-        showAlert(
-          'Login Gagal',
-          'NIS atau Password yang kamu masukkan salah. Silakan periksa kembali data kamu.'
-        );
-      } 
-      // KONDISI 3: Benar-benar tidak ada sinyal / server Laragon mati total
-      else {
-        showAlert(
-          'Masalah Koneksi',
-          'Tidak dapat memproses login. Pastikan server backend sudah menyala, IP sudah sesuai, dan fitur CORS di backend sudah diizinkan untuk akses Web.'
-        );
+        showAlert('Login Gagal', 'NIS atau Password yang kamu masukkan salah.');
+      } else {
+        showAlert('Masalah Koneksi', 'Tidak dapat memproses login. Pastikan server menyala.');
       }
     } finally {
       setLoading(false);
@@ -145,111 +71,77 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[
-        '#ffe8e8',
-        '#f4f5f9',
-        '#ffffff'
-      ]}
-      style={styles.gradient}
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* BACKGROUND POLKADOT (Hanya dirender jika di HP biar performa Web tidak berat saat resize) */}
-      <View style={styles.dotsContainer}>
-        {[...Array(Platform.OS === 'web' ? 50 : 150)].map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              {
-                left: Math.random() * (Platform.OS === 'web' ? 1200 : 400),
-                top: Math.random() * 900,
-              }
-            ]}
-          />
+      <StatusBar barStyle="dark-content" backgroundColor="#f4f5f9" />
+
+      {/* REPRODUKSI POLKADOT GRID Khas Web ke Mobile (Menggunakan Dot Kecil Berulang) */}
+      <View style={styles.dotGridContainer}>
+        {Array.from({ length: 45 }).map((_, i) => (
+          <View key={i} style={styles.gridDot} />
         ))}
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="always"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#ffe8e8"
-        />
+        {/* LOGIN HEADER */}
+        <View style={styles.header}>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>SEBSTAR</Text>
+          <Text style={styles.subtitle}>Sistem Ujian Digital</Text>
+        </View>
 
-        {/* CONTAINER CARD */}
-        <View style={styles.card}>
-
-          {/* SECTION HEADER & ANIMATED LOGO */}
-          <Animated.View
-            style={[
-              styles.header,
-              {
-                transform: [
-                  { translateY: floatAnim }
-                ]
-              }
-            ]}
-          >
-            <Image
-              source={require('../../assets/images/icon.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.title}>SEBSTAR</Text>
-            <Text style={styles.subtitle}>Sistem Ujian Digital</Text>
-          </Animated.View>
-
-          {/* INPUT FOR NIS */}
-          <View
-            style={[
-              styles.inputGroup,
-              nisFocused && styles.inputFocused
-            ]}
-          >
-            <User
-              size={18}
-              color={nisFocused ? '#cd0000' : '#a0a0b0'}
-              style={styles.icon}
-            />
+        {/* CONTAINER FORM FLAT (Rata Layar, Bebas Intercept Touch Android) */}
+        <View style={styles.formContainer}>
+          
+          {/* INPUT NIS */}
+          <Text style={[styles.inputLabel, nisFocused && styles.labelFocused]}>NOMOR INDUK SISWA (NIS)</Text>
+          <View style={[styles.inputGroup, nisFocused && styles.inputFocused]}>
+            <User size={18} color={nisFocused ? '#cd0000' : '#a0a0b0'} style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Masukkan NIS"
-              placeholderTextColor="#999"
+              placeholder="Masukkan NIS Anda"
+              placeholderTextColor="#a0a0b0"
               value={nis}
               onChangeText={setNis}
               keyboardType="numeric"
               onFocus={() => setNisFocused(true)}
               onBlur={() => setNisFocused(false)}
+              returnKeyType="next"
+              disableFullscreenKeyboard={true}
             />
           </View>
 
-          {/* INPUT FOR PASSWORD */}
-          <View
-            style={[
-              styles.inputGroup,
-              passwordFocused && styles.inputFocused
-            ]}
-          >
-            <Lock
-              size={18}
-              color={passwordFocused ? '#cd0000' : '#a0a0b0'}
-              style={styles.icon}
-            />
+          {/* INPUT PASSWORD */}
+          <Text style={[styles.inputLabel, passwordFocused && styles.labelFocused]}>PASSWORD AKUN</Text>
+          <View style={[styles.inputGroup, passwordFocused && styles.inputFocused]}>
+            <Lock size={18} color={passwordFocused ? '#cd0000' : '#a0a0b0'} style={styles.icon} />
             <TextInput
               style={styles.input}
               placeholder="Masukkan Password"
-              placeholderTextColor="#999"
+              placeholderTextColor="#a0a0b0"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              disableFullscreenKeyboard={true}
             />
           </View>
 
-          {/* ACTION BUTTON */}
+          {/* TOMBOL LOGIN GRADASI GRADIENT IMITASI MERAH TEGAS */}
           <TouchableOpacity
             style={styles.button}
             onPress={handleLogin}
@@ -257,142 +149,172 @@ export default function LoginScreen() {
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#ffffff" />
             ) : (
               <View style={styles.buttonContent}>
                 <Text style={styles.buttonText}>MASUK SISTEM</Text>
-                <LogIn size={18} color="#fff" />
+                <LogIn size={18} color="#ffffff" />
               </View>
             )}
           </TouchableOpacity>
-
         </View>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+
+        
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f4f5f9' /* Warna dasar abu-abu web */
   },
-  container: {
-    flex: 1,
+  dotGridContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 15,
+    gap: 24,
+    opacity: 0.7
+  },
+  gridDot: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(230, 57, 70, 0.2)' /* Mengimitasi efek polkadot grid merah di CSS */
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    maxWidth: Platform.OS === 'web' ? 450 : '100%', // Biar di web tampilannya proporsional di tengah layaknya aplikasi mobile
-    alignSelf: 'center',
-    width: '100%',
-  },
-  dotsContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  dot: {
-    position: 'absolute',
-    width: 4,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(205,0,0,0.12)',
-  },
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.85)', // Ditingkatkan opacity-nya agar kontras di web aman
-    borderRadius: 30,
-    padding: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 25,
-    elevation: 10,
-    overflow: 'hidden',
+    paddingHorizontal: 30,
+    paddingTop: 50,
+    paddingBottom: 30,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 40,
   },
   logo: {
-    width: 90,
-    height: 90,
+    width: 75,
+    height: 75,
+    borderRadius: 16,
     marginBottom: 15,
+    // Bayangan merah lembut untuk logo sesuai css web
+    shadowColor: '#cd0000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+    elevation: 4,
+    backgroundColor: '#fff'
   },
   title: {
-    fontSize: 30,
-    fontWeight: '900',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#1e1e2f',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
   subtitle: {
-    marginTop: 6,
+    marginTop: 5,
     fontSize: 13,
     color: '#cd0000',
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 380,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  labelFocused: {
+    color: '#cd0000'
   },
   inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    borderRadius: 16,
+    backgroundColor: '#ffffff', /* Kotak Putih Bersih Solid */
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: 12,
     paddingHorizontal: 16,
     marginBottom: 18,
+    // Shadow tipis bawah
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    elevation: 1,
   },
   inputFocused: {
-    borderColor: '#cd0000',
-    backgroundColor: '#fff',
+    borderColor: '#cd0000', /* Nyala merah tegas khas SEBSTAR */
+    backgroundColor: '#ffffff',
     shadowColor: '#cd0000',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  icon: {
-    marginRight: 10,
-  },
+  icon: { marginRight: 12 },
   input: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     fontSize: 14,
     color: '#1e1e2f',
     fontWeight: '600',
-    outlineStyle: Platform.OS === 'web' ? 'none' : undefined, // Hilangkan outline bawaan browser di web
+    ...Platform.select({
+      web: { outlineStyle: 'none' }
+    }),
   },
   button: {
-    marginTop: 10,
-    backgroundColor: '#cd0000',
-    borderRadius: 16,
-    paddingVertical: 16,
+    marginTop: 15,
+    backgroundColor: '#cd0000', /* Base warna merah tua web */
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
     shadowColor: '#cd0000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-    cursor: Platform.OS === 'web' ? 'pointer' : 'auto', // Memberi efek pointer mouse kalau dibuka di web
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  buttonContent: {
+  buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
+  forgotFooter: {
+    width: '100%',
+    maxWidth: 380,
+    marginTop: 25,
+    paddingHorizontal: 4,
+  },
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 15,
+  infoIcon: {
+    marginTop: 2,
+    marginRight: 6,
+  },
+  forgotText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  highlightText: {
+    color: '#cd0000',
     fontWeight: '700',
-    letterSpacing: 1,
-  },
+  }
 });

@@ -98,6 +98,9 @@ class ExamTypeController extends Controller
     /**
      * Menghapus tipe ujian (Destroy)
      */
+    /**
+     * Menghapus tipe ujian (Destroy)
+     */
     public function destroy($id)
     {
         $type = ExamType::findOrFail($id);

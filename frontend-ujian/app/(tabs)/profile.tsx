@@ -172,7 +172,7 @@ export default function ProfileScreen() {
           
           <View style={styles.infoRowDisabled}>
             <Ionicons name="id-card-outline" size={20} color="#94a3b8" />
-            <Text style={styles.infoLabelDisabled}>NIS / NIM:</Text>
+            <Text style={styles.infoLabelDisabled}>NIS:</Text>
             <Text style={styles.infoValueDisabled}>{user?.nis ?? '-'}</Text>
           </View>
 
