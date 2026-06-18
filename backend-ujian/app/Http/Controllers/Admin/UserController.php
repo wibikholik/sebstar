@@ -20,7 +20,6 @@ class UserController extends Controller
     {
         $query = User::with(['subject', 'classroom']);
 
-        // Filter dinamis dari klik Dashboard Admin (?role=guru)
         if ($request->has('role') && $request->role != '') {
             $query->where('role', $request->role);
         }
@@ -78,7 +77,6 @@ class UserController extends Controller
             User::create($data);
 
             return redirect()->route('admin.users.index')->with('success', 'User ' . $request->name . ' Berhasil Ditambahkan!');
-
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
@@ -91,11 +89,10 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // VALIDASI PASSING PASSWORD EDIT (Wajib min 6 jika diisi oleh admin)
         $request->validate([
             'name'         => 'required|string|max:255',
             'email'        => 'required|email|max:255|unique:users,email,' . $id,
-            'password'     => 'nullable|string|min:6', // Terkunci aman minimal 6 karakter
+            'password'     => 'nullable|string|min:6',
             'role'         => 'required|in:admin,guru,pengawas,siswa',
             'nis'          => 'required_if:role,siswa|nullable|string|max:50|unique:users,nis,' . $id,
             'nip'          => 'required_if:role,guru|nullable|string|max:50|unique:users,nip,' . $id,
@@ -123,13 +120,11 @@ class UserController extends Controller
                 'role'  => $request->role,
             ];
 
-            // Set null kolom relasi jika admin memutar balik role user saat di-edit
             $data['nis']          = ($request->role === 'siswa') ? $request->nis : null;
             $data['classroom_id'] = ($request->role === 'siswa') ? $request->classroom_id : null;
             $data['nip']          = ($request->role === 'guru') ? $request->nip : null;
             $data['subject_id']   = ($request->role === 'guru') ? $request->subject_id : null;
 
-            // Enkripsi password baru hanya jika kolom password diisi admin
             if ($request->filled('password')) {
                 $data['password'] = Hash::make($request->password);
             }
@@ -138,7 +133,6 @@ class UserController extends Controller
 
             return redirect()->route('admin.users.index')->with('success', 'Data ' . $user->name . ' berhasil diperbarui!');
         } catch (\Exception $e) {
-            // Memberikan tanda penampung sesi khusus 'edit' agar modal otomatis terkunci terbuka pasca-reload
             return redirect()->back()
                 ->withInput()
                 ->with('error_form_type', 'edit')
@@ -160,52 +154,78 @@ class UserController extends Controller
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus!');
     }
+
+    /**
+     * 🚀 FITUR FIX: Memproses Import Excel/CSV secara aman tanpa kebocoran SQL Error
+     */
     public function importExcel(Request $request)
-{
-    $request->validate([
-        'file_excel' => 'required|mimes:xlsx,xls,csv|max:5120', // Validasi file maks 5MB
-    ]);
+    {
+        $request->validate([
+            'file_excel' => 'required|file|mimes:xlsx,xls,csv,txt|max:5120',
+        ], [
+            'file_excel.required' => 'Pilih file terlebih dahulu!',
+            'file_excel.mimes'    => 'Format file harus berupa .xlsx, .xls, atau .csv!',
+        ]);
 
-    try {
-        Excel::import(new UsersImport, $request->file('file_excel'));
-        
-        return redirect()->back()->with('success', '✨ Data pengguna berhasil diimpor massal ke database!');
-    } catch (\Exception $e) {
-        return redirect()->back()->with('error', '⚠ Gagal memproses data. Periksa kembali struktur template! Info: ' . $e->getMessage());
+        try {
+            $file = $request->file('file_excel');
+
+            // Jika eksetensi file murni .csv, paksa baca sebagai CSV murni
+            if ($file->getClientOriginalExtension() === 'csv') {
+                Excel::import(new UsersImport, $file, null, \Maatwebsite\Excel\Excel::CSV);
+            } else {
+                Excel::import(new UsersImport, $file);
+            }
+            
+            return redirect()->back()->with('success', '✨ Data pengguna berhasil diimpor massal ke database!');
+
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorPesan = '<strong>Gagal Import Massal! Periksa baris berikut:</strong><br>';
+            
+            foreach ($failures as $failure) {
+                $errorPesan .= '• Baris ke-' . $failure->row() . ': ' . implode(', ', $failure->errors()) . '<br>';
+            }
+            
+            return redirect()->back()->with('error', $errorPesan);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', '⚠ Gagal memproses berkas. Pastikan struktur kolom header template sesuai!');
+        }
     }
-}
 
-public function downloadTemplate()
-{
-    $namaFile = "template_pengguna_sebstar.csv";
+    /**
+     * Mengunduh Template CSV Contoh untuk Admin
+     */
+    public function downloadTemplate()
+    {
+        $namaFile = "template_pengguna_sebstar.csv";
 
-    $headers = [
-        "Content-type"        => "text/csv; charset=UTF-8",
-        "Content-Disposition" => "attachment; filename={$namaFile}",
-        "Pragma"              => "no-cache",
-        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-        "Expires"             => "0"
-    ];
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename={$namaFile}",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
 
-    // Menggunakan nama_kelas dan nama_mapel agar manusiawi bagi Admin
-    $columns = ['name', 'email', 'password', 'role', 'nomor_induk', 'nama_kelas', 'nama_mapel'];
+        $columns = ['name', 'email', 'password', 'role', 'nomor_induk', 'nama_kelas', 'nama_mapel'];
 
-    $callback = function() use($columns) {
-        $file = fopen('php://output', 'w');
-        fputcsv($file, $columns);
-        
-        // Contoh Siswa: Langsung isi teks nama kelasnya
-        fputcsv($file, ['Ahmad Siswa', 'ahmad@sebstar.com', 'rahasia123', 'siswa', '10224001', 'XI-RPL-1', '']);
-        
-        // Contoh Guru: Langsung isi teks nama mata pelajarannya
-        fputcsv($file, ['Budi Guru', 'budi@sebstar.com', 'passwordguru', 'guru', '1988010202', '', 'Matematika']);
-        
-        // Contoh Pengawas
-        fputcsv($file, ['Siti Pengawas', 'siti@sebstar.com', 'passwordpw', 'pengawas', '1992050301', '', '']);
-        
-        fclose($file);
-    };
+        $callback = function() use($columns) {
+            $file = fopen('php://output', 'w');
+            
+            // Mengirimkan tanda pengenal UTF-8 BOM agar Excel rapi saat membuka file csv
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($file, $columns);
+            
+            // Contoh baris template pengisian data master
+            fputcsv($file, ['Ahmad Siswa', 'ahmad@sebstar.com', 'rahasia123', 'siswa', '10224001', 'XI-RPL-1', '']);
+            fputcsv($file, ['Budi Guru', 'budi@sebstar.com', 'passwordguru', 'guru', '1988010202', '', 'Matematika']);
+            fputcsv($file, ['Siti Pengawas', 'siti@sebstar.com', 'passwordpw', 'pengawas', '1992050301', '', '']);
+            
+            fclose($file);
+        };
 
-    return response()->stream($callback, 200, $headers);
-}
+        return response()->stream($callback, 200, $headers);
+    }
 }

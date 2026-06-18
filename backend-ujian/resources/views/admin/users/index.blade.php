@@ -2,8 +2,6 @@
 
 @section('title', 'Kelola Pengguna')
 
-
-
 @section('content')
 
 <div class="stats-grid">
@@ -56,7 +54,7 @@
             </a>
             <form action="{{ route('admin.users.import') }}" method="POST" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 10px; margin: 0;">
                 @csrf
-                <input type="file" name="file_excel" required class="file-input-custom">
+                <input type="file" name="file_excel" required accept=".xlsx, .xls, .csv" class="file-input-custom">
                 <button type="submit" class="btn-process-import">
                     <i class="fas fa-cloud-upload-alt"></i> Proses Import
                 </button>
@@ -76,9 +74,12 @@
             <i class="fas fa-check-circle"></i> {{ session('success') }}
         </div>
     @endif
+    
+    {{-- 🛠️ PERBAIKAN UTAMA: Menggunakan unescaped tags agar baris instruksi error <br> terbaca rapi --}}
     @if(session('error'))
-        <div style="background: #fee2e2; color: #b91c1c; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #fecaca; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+        <div style="background: #fee2e2; color: #b91c1c; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #fecaca; display: flex; align-items: flex-start; gap: 8px; line-height: 1.6;">
+            <i class="fas fa-exclamation-circle" style="margin-top: 4px;"></i> 
+            <div>{!! session('error') !!}</div>
         </div>
     @endif
 
@@ -149,8 +150,8 @@
 
 @include('admin.users.create')
 @include('admin.users.edit')
+
 <style>
-    /* Background dengan Gradasi Merah-Putih Tegas + Efek Polkadot Grid Modern */
     body {
         background-color: #f4f5f9 !important;
         background-image: 
@@ -160,7 +161,6 @@
         background-attachment: fixed !important;
     }
 
-    /* ================= STATS CARD SYSTEM ================= */
     .stats-grid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
@@ -197,7 +197,6 @@
         transition: all 0.4s ease !important;
     }
 
-    /* Warna Icon Menyesuaikan Fungsi Fitur */
     .icon-siswa { background: rgba(30, 144, 255, 0.1) !important; color: #1e90ff !important; }
     .icon-guru { background: rgba(46, 204, 113, 0.1) !important; color: #2ecc71 !important; }
     .icon-pengawas { background: rgba(241, 196, 15, 0.1) !important; color: #f1c40f !important; }
@@ -222,7 +221,6 @@
         margin: 4px 0 0 0 !important;
     }
 
-    /* ================= CONTENT BOX & BAR MULTIPURPOSE ================= */
     .content-box {
         background: #ffffff !important;
         border-radius: 16px !important;
@@ -248,7 +246,6 @@
         gap: 8px !important;
     }
 
-    /* Panel Import Excel Kontainer Khusus */
     .import-panel {
         background: #fafafa !important;
         border: 1px dashed #e2e8f0 !important;
@@ -327,10 +324,7 @@
         box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25) !important;
     }
 
-    /* Input Search Elegan */
-    .search-wrapper {
-        position: relative !important;
-    }
+    .search-wrapper { position: relative !important; }
 
     .search-input {
         background: #f4f5f9 !important;
@@ -350,7 +344,6 @@
         outline: none !important;
     }
 
-    /* Tombol Tambah Pengguna Premium */
     .btn-add {
         background: linear-gradient(135deg, #cd0000 0%, #950000 100%) !important;
         color: #ffffff !important;
@@ -373,7 +366,6 @@
         filter: brightness(1.1) !important;
     }
 
-    /* Tab Switcher Gaya Navigasi Modern */
     .tab-switcher {
         display: flex !important;
         gap: 10px !important;
@@ -403,7 +395,6 @@
         box-shadow: 0 4px 12px rgba(205, 0, 0, 0.15) !important;
     }
 
-    /* ================= TABLE PREMIUM REVOLUTION ================= */
     table {
         width: 100% !important;
         border-collapse: collapse !important;
@@ -430,11 +421,8 @@
         vertical-align: middle !important;
     }
 
-    tr:hover td {
-        background: #fcfcfd !important;
-    }
+    tr:hover td { background: #fcfcfd !important; }
 
-    /* Badge Role Custom */
     .badge-role {
         text-transform: uppercase !important;
         padding: 5px 12px !important;
@@ -447,7 +435,6 @@
     .badge-guru { background: rgba(46, 204, 113, 0.1) !important; color: #2ecc71 !important; }
     .badge-pengawas { background: rgba(241, 196, 15, 0.1) !important; color: #b79407 !important; }
 
-    /* Tombol Aksi Mini */
     .btn-table-action {
         background: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -467,6 +454,7 @@
     .btn-table-action.btn-delete { color: #e74c3c !important; margin-left: 4px !important; }
     .btn-table-action.btn-delete:hover { border-color: #e74c3c !important; background: rgba(231, 76, 60, 0.05) !important; }
 </style>
+
 <script>
     function openModal() {
         document.getElementById("userModal").style.display = "block";

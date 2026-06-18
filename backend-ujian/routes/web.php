@@ -42,16 +42,29 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/dashboard', [AdminDash::class, 'index'])->name('admin.dashboard');
 
-    // 🚀 FITUR BARU: Rute Khusus Import & Download Template Excel PENGGUNA SEBSTAR
+    // 🚀 FITUR: Rute Khusus Import & Download Template Excel PENGGUNA SEBSTAR
     Route::post('/users/import', [UserController::class, 'importExcel'])->name('admin.users.import');
     Route::get('/users/download-template', [UserController::class, 'downloadTemplate'])->name('admin.users.download_template');
 
-    // Manajemen Data Master
+    // Manajemen Data Master Users
     Route::resource('users', UserController::class)->names('admin.users');
     
+    // 🚀 FITUR BARU: Rute Khusus Import & Download Template Excel MATA PELAJARAN (SUBJECTS)
+    // Ditambahkan di sini agar menghentikan error "not defined" di Blade
+    Route::get('/subjects/download-template', [SubjectController::class, 'downloadTemplate'])->name('admin.subjects.template');
+    Route::post('/subjects/import-excel', [SubjectController::class, 'importExcel'])->name('admin.subjects.import');
+
+    // Manajemen Data Master Subjects
     Route::resource('subjects', SubjectController::class)->names('admin.subjects');
-    Route::resource('classrooms', ClassroomController::class)->names('admin.classrooms');
-    Route::resource('majors', MajorController::class)->names('admin.majors');
+    
+   // 🚀 ROUTE CUSTOM UNTUK IMPORT & DOWNLOAD TEMPLATE GABUNGAN
+Route::get('classrooms/download-template', [ClassroomController::class, 'downloadTemplateGabungan'])->name('admin.classrooms.download_template');
+Route::post('classrooms/import-gabungan', [ClassroomController::class, 'importGabungan'])->name('admin.classrooms.import');
+
+// Route Resource Bawaan (Tetap di bawah)
+Route::resource('classrooms', ClassroomController::class)->names('admin.classrooms');
+Route::resource('majors', MajorController::class)->names('admin.majors');
+
     
     // MODUL TYPE UJIAN
     Route::resource('exam-types', ExamTypeController::class)
@@ -65,8 +78,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
     // API Fetch Guru
     Route::get('/get-teachers/{subject_id}', [ScheduleController::class, 'getTeachers'])->name('admin.get-teachers');
 
-    // 🚀 FITUR BARU: Rute Khusus Import & Download Template Excel SOAL/QUESTIONS SEBSTAR
-    // Diletakkan tepat di atas resource agar parameter routing tidak bentrok
+    // 🚀 FITUR: Rute Khusus Import & Download Template Excel SOAL/QUESTIONS SEBSTAR
     Route::get('/questions/download-template', [QuestionController::class, 'downloadTemplate'])->name('admin.questions.download_template');
     Route::post('/schedules/{schedule_id}/questions/import', [QuestionController::class, 'importExcel'])->name('admin.questions.import');
 
@@ -92,18 +104,16 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
     Route::post('/schedules/{id}/toggle-status', [App\Http\Controllers\Guru\ScheduleController::class, 'toggleStatus'])->name('schedules.toggle-status');
 
     // 3. Modul Manajemen Soal (Questions)
-    // PENTING: Diletakkan di atas Route::resource agar tidak dianggap sebagai ID soal
     Route::get('/questions/download-template', [\App\Http\Controllers\Guru\QuestionController::class, 'downloadTemplate'])->name('questions.download_template');
     Route::post('/questions/import/{schedule_id}', [\App\Http\Controllers\Guru\QuestionController::class, 'importExcel'])->name('questions.import');
     Route::post('/questions/copy/{schedule_id}', [\App\Http\Controllers\Guru\QuestionController::class, 'copy'])->name('questions.copy');
     Route::get('/questions/manage/{schedule_id}', [\App\Http\Controllers\Guru\QuestionController::class, 'manage'])->name('questions.manage');
 
-    // MENGGUNAKAN 'except' AGAR TIDAK MENCARI METHOD 'show'
     Route::resource('questions', \App\Http\Controllers\Guru\QuestionController::class)
         ->names('questions')
         ->except(['show', 'create', 'edit']);
 
-    // 4. Modul Monitoring (DITAMBAHKAN ROUTE RESET SISWA)
+    // 4. Modul Monitoring
     Route::get('/monitoring', [GuruMonitor::class, 'index'])->name('monitoring.index');
     Route::get('/monitoring/{id}', [GuruMonitor::class, 'show'])->name('monitoring.show');
     Route::post('/monitoring/{schedule_id}/reset/{student_id}', [GuruMonitor::class, 'resetStudent'])->name('monitoring.reset');
@@ -125,7 +135,7 @@ Route::prefix('guru')->middleware(['auth', 'role:guru'])->name('guru.')->group(f
 Route::prefix('pengawas')->middleware(['auth', 'role:pengawas'])->name('pengawas.')->group(function () {
     Route::get('/dashboard', [PengawasDash::class, 'index'])->name('dashboard');
     
-    // Modul Monitoring (DITAMBAHKAN ROUTE RESET SISWA)
+    // Modul Monitoring
     Route::get('/monitoring', [PengawasMonitor::class, 'index'])->name('monitoring.index');
     Route::get('/monitoring/{id}', [PengawasMonitor::class, 'show'])->name('monitoring.show');
     Route::post('/monitoring/{schedule_id}/reset/{student_id}', [PengawasMonitor::class, 'resetStudent'])->name('monitoring.reset');

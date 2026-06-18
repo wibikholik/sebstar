@@ -62,6 +62,62 @@
         filter: brightness(1.1) !important;
     }
 
+    /* Panel Import Excel Kontainer Khusus */
+    .import-panel {
+        background: #fafafa !important;
+        border: 1px dashed #e2e8f0 !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        margin-bottom: 25px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 15px !important;
+    }
+
+    .btn-download-template {
+        background: #f1f5f9 !important;
+        color: #475569 !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 9px 18px !important;
+        border-radius: 20px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .btn-download-template:hover {
+        background: #e2e8f0 !important;
+        color: #1e293b !important;
+    }
+
+    .btn-process-import {
+        background: linear-gradient(135deg, #107c41 0%, #0b592e 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        border-radius: 20px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        box-shadow: 0 4px 12px rgba(16, 124, 65, 0.2) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .btn-process-import:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 18px rgba(16, 124, 65, 0.3) !important;
+        filter: brightness(1.1) !important;
+    }
+
     /* ================= TABLE PREMIUM REVOLUTION ================= */
     table {
         width: 100% !important;
@@ -137,10 +193,26 @@
 
 {{-- Alert Notifikasi Gagal / Pelanggaran Relasi --}}
 @if(session('error'))
-    <div style="background: rgba(231, 76, 60, 0.1); color: #c0392b; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-size: 13px; font-weight: 600; border-left: 4px solid #e74c3c; display: flex; align-items: center; gap: 8px;">
-        ⚠️ {{ session('error') }}
+    <div style="background: rgba(231, 76, 60, 0.1); color: #c0392b; padding: 14px 20px; border-radius: 10px; margin-bottom: 25px; font-size: 13px; font-weight: 600; border-left: 4px solid #e74c3c; display: flex; align-items: flex-start; gap: 8px; line-height: 1.6;">
+        ⚠️ <div>{!! session('error') !!}</div>
     </div>
 @endif
+
+{{-- 🚀 FITUR GABUNGAN: Panel Unduh Template & Pemicu Modal Import Massal --}}
+<div class="import-panel">
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 14px; font-weight: 700; color: #1e1e2f;">Import Sinkronisasi Kelas & Jurusan</span>
+        <span style="font-size: 12px; color: #64748b;">Unggah satu file untuk mendaftarkan struktur kompetensi jurusan baru sekaligus rombel kelas.</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <a href="{{ route('admin.classrooms.download_template') }}" class="btn-download-template">
+            <i class="fas fa-file-download"></i> Unduh Template CSV
+        </a>
+        <button class="btn-process-import" onclick="openImportModal()">
+            <i class="fas fa-file-import"></i> Jalankan Import Massal
+        </button>
+    </div>
+</div>
 
 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 30px;">
     
@@ -238,6 +310,33 @@
     </div>
 </div>
 
+{{-- 🚀 MODAL INTERAKTIF BARU: Pemrosesan Unggah Berkas Gabungan Kelas & Jurusan --}}
+<div id="modalImport" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);">
+    <div style="background: #ffffff; width: 450px; margin: 10% auto; padding: 25px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #edf0f5; padding-bottom: 12px;">
+            <h4 style="font-size: 16px; font-weight: 700; color: #1e1e2f; margin: 0;"><i class="fas fa-file-csv" style="color: #107c41; margin-right: 6px;"></i> Import Gabungan Kelas & Jurusan</h4>
+            <span style="cursor: pointer; font-size: 20px; color: #94a3b8;" onclick="closeImportModal()">&times;</span>
+        </div>
+        
+        <div style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 12px; color: #64748b; line-height: 1.5;">
+            <i class="fas fa-info-circle" style="color: #cd0000;"></i> <strong>Sistem Otomatisasi SEBSTAR:</strong><br>
+            Sistem akan mencocokkan singkatan jurusan. Jika singkatan belum ada, sistem mendaftarkan kompetensi jurusan baru terlebih dahulu, lalu rombel kelas terkait akan langsung tersambung otomatis.
+        </div>
+
+        <form action="{{ route('admin.classrooms.import') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase;">Pilih File Template (.csv / .xlsx)</label>
+                <input type="file" name="file_excel" required accept=".csv, .xlsx, .xls" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #edf0f5; padding-top: 15px;">
+                <button type="button" onclick="closeImportModal()" style="background: #f1f5f9; color: #475569; border: none; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer;">Batal</button>
+                <button type="submit" style="background: linear-gradient(135deg, #107c41 0%, #0b592e 100%); color: #ffffff; border: none; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 124, 65, 0.2);"><i class="fas fa-upload"></i> Jalankan Sinkronisasi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {{-- Form Hidden untuk Eksekusi Hapus Data Route --}}
 <form id="delete-major-form" method="POST" style="display:none;"> @csrf @method('DELETE') </form>
 <form id="delete-class-form" method="POST" style="display:none;"> @csrf @method('DELETE') </form>
@@ -276,12 +375,19 @@
     }
 
     // --- SINKRONISASI MANAJEMEN MODAL KELAS (CLASSROOM) ---
-    // PERBAIKAN: Menyesuaikan target pemicu ID modalCreate kelas agar sinkron dengan file modal baru
     function openClassModal() { 
         document.getElementById('modalCreate').style.display = 'block'; 
     }
     function closeModal() { 
         document.getElementById('modalCreate').style.display = 'none'; 
+    }
+
+    // --- MANAJEMEN PANDUAN MODAL IMPORT GABUNGAN ---
+    function openImportModal() {
+        document.getElementById('modalImport').style.display = 'block';
+    }
+    function closeImportModal() {
+        document.getElementById('modalImport').style.display = 'none';
     }
 
     function openEditClassModal(item) {
@@ -304,8 +410,7 @@
 
     // Auto close modal jika admin tidak sengaja mengklik area abu-abu di luar box modal
     window.onclick = function(event) {
-        // PERBAIKAN: Memetakan ulang susunan array ID pembungkus modal yang valid
-        const modalIds = ['modalMajor', 'modalMajorEdit', 'modalCreate', 'modalEditClass'];
+        const modalIds = ['modalMajor', 'modalMajorEdit', 'modalCreate', 'modalEditClass', 'modalImport'];
         modalIds.forEach(id => {
             const m = document.getElementById(id);
             if (m && event.target == m) {

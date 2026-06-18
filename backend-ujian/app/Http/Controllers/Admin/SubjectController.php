@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Subject;
 use Illuminate\Http\Request;
+use App\Imports\SubjectImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SubjectController extends Controller
 {
@@ -22,7 +24,6 @@ class SubjectController extends Controller
      */
     public function store(Request $request)
     {
-        // VALIDASI KETAT: Kode & nama mapel wajib diisi, minimal 3 karakter, dan harus unik
         $request->validate([
             'kode_mapel' => 'required|string|min:3|max:50|unique:subjects,kode_mapel',
             'nama_mapel' => 'required|string|min:3|max:255|unique:subjects,nama_mapel',
@@ -39,15 +40,78 @@ class SubjectController extends Controller
 
         try {
             Subject::create([
-                'kode_mapel' => strtoupper($request->kode_mapel), // Memaksa tersimpan huruf kapital (MAT-01)
+                'kode_mapel' => strtoupper($request->kode_mapel), 
                 'nama_mapel' => $request->nama_mapel,
             ]);
 
             return redirect()->back()->with('success', 'Mata Pelajaran "' . $request->nama_mapel . '" berhasil ditambah!');
-
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', 'Gagal memproses data: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Memproses Import Excel/CSV Massal
+     */
+    public function importExcel(Request $request)
+    {
+        $request->validate([
+            'file_excel' => 'required|file|mimes:xlsx,xls,csv,txt|max:5120',
+        ], [
+            'file_excel.required' => 'Pilih file terlebih dahulu!',
+            'file_excel.mimes'    => 'Format file harus berupa .xlsx, .xls, atau .csv!',
+            'file_excel.max'      => 'Ukuran file maksimal adalah 5MB!',
+        ]);
+
+        try {
+            $file = $request->file('file_excel');
+
+            // 🛠️ PERBAIKAN 1: Deteksi jika file adalah CSV murni, paksa pembacaan sebagai CSV murni
+            if ($file->getClientOriginalExtension() === 'csv') {
+                Excel::import(new SubjectImport, $file, null, \Maatwebsite\Excel\Excel::CSV);
+            } else {
+                Excel::import(new SubjectImport, $file);
+            }
+
+            return redirect()->back()->with('success', 'Semua data mata pelajaran berhasil diimport massal!');
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorPesan = 'Gagal import! ';
+            foreach ($failures as $failure) {
+                $errorPesan .= 'Baris ke-' . $failure->row() . ': ' . implode(', ', $failure->errors()) . ' | ';
+            }
+            return redirect()->back()->with('error', $errorPesan);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat membaca file: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Mengunduh Template CSV Contoh untuk Admin
+     */
+    public function downloadTemplate()
+    {
+        // 🛠️ PERBAIKAN 2: Ubah Header dan Extention menjadi .csv agar sesuai dengan isi fputcsv
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="template_mata_pelajaran.csv"',
+        ];
+
+        return response()->streamDownload(function() {
+            $file = fopen('php://output', 'w');
+            
+            // Mengirimkan BOM UTF-8 agar Excel tidak berantakan saat membuka tanda baca/karakter unik
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Baris 1: Header Excel (Sesuai dengan key $row di SubjectImport)
+            fputcsv($file, ['kode_mapel', 'nama_mapel']);
+            
+            // Baris 2 & 3: Contoh data pengisian
+            fputcsv($file, ['MAT-01', 'Matematika Wajib']);
+            fputcsv($file, ['ING-02', 'Bahasa Inggris Tingkat Lanjut']);
+            
+            fclose($file);
+        }, 'template_mata_pelajaran.csv', $headers);
     }
 
     /**
@@ -55,7 +119,6 @@ class SubjectController extends Controller
      */
     public function update(Request $request, Subject $subject)
     {
-        // VALIDASI UPDATE: Mengunci keunikan dengan mengecualikan ID mapel terpilih saat ini
         $request->validate([
             'kode_mapel' => 'required|string|min:3|max:50|unique:subjects,kode_mapel,' . $subject->id,
             'nama_mapel' => 'required|string|min:3|max:255|unique:subjects,nama_mapel,' . $subject->id,
@@ -75,9 +138,7 @@ class SubjectController extends Controller
             ]);
 
             return redirect()->back()->with('success', 'Mata Pelajaran berhasil diupdate!');
-
         } catch (\Exception $e) {
-            // Menyisipkan sesi penanda 'edit' agar modal edit tahu dia wajib mengunci diri tetap terbuka
             return redirect()->back()
                 ->withInput()
                 ->with('error_form_type', 'edit')
@@ -91,14 +152,12 @@ class SubjectController extends Controller
     public function destroy(Subject $subject)
     {
         try {
-            // CEK CONSTRAINT: Pastikan mapel belum terikat pada data jadwal pelaksanaan ujian manapun
             if ($subject->schedules()->count() > 0) {
                 return redirect()->back()->with('error', 'Gagal menghapus! Mata pelajaran ini tidak bisa dihapus karena sudah digunakan pada jadwal pelaksanaan ujian.');
             }
 
             $subject->delete();
             return redirect()->back()->with('success', 'Mata Pelajaran berhasil dihapus!');
-
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kendala saat menghapus data: ' . $e->getMessage());
         }

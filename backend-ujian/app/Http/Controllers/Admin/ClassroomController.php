@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Classroom;
 use App\Models\Major;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\ClassMajorImport; // Pastikan ini di-import
 
 class ClassroomController extends Controller
 {
@@ -68,7 +70,6 @@ class ClassroomController extends Controller
             return redirect()->back()->with('success', 'Data kelas ' . $classroom->nama_kelas . ' berhasil diperbarui!');
 
         } catch (\Exception $e) {
-            // Menyisipkan sesi penanda 'edit' agar komponen blade tahu modal edit yang harus dibuka pasca-reload
             return redirect()->back()
                 ->withInput()
                 ->with('error_form_type', 'edit')
@@ -82,13 +83,10 @@ class ClassroomController extends Controller
     public function destroy(Classroom $classroom)
     {
         try {
-            // PROTEKSI INTEGRITAS DATA: Cek apakah kelas ini masih dihuni oleh user (siswa)
-            // Pastikan di model Classroom kamu sudah ada fungsi relasi bernama 'users' atau 'students'
             if ($classroom->users()->count() > 0) {
                 return redirect()->back()->with('error', 'Gagal menghapus! Rombel kelas ini tidak bisa dihapus karena masih memiliki data siswa aktif di dalamnya.');
             }
 
-            // Tambahan cek jika kelas sudah masuk dalam riwayat plotting jadwal ujian
             if ($classroom->schedules()->count() > 0) {
                 return redirect()->back()->with('error', 'Gagal menghapus! Kelas ini sudah terikat dengan jadwal pelaksanaan ujian aktif.');
             }
@@ -99,5 +97,87 @@ class ClassroomController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kendala sistem saat menghapus kelas: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * 🚀 FITUR BARU: Memproses Import Gabungan Kelas & Jurusan Massal via Excel/CSV
+     */
+    public function importGabungan(Request $request)
+    {
+        $request->validate([
+            'file_excel' => 'required|file|mimes:xlsx,xls,csv,txt|max:5120',
+        ], [
+            'file_excel.required' => 'Silakan pilih berkas terlebih dahulu!',
+            'file_excel.mimes'    => 'Format berkas harus berupa .xlsx, .xls, atau .csv!',
+        ]);
+
+        try {
+            $file = $request->file('file_excel');
+
+            // Cek jika ekstensi file adalah csv, paksa pembacaan sebagai CSV murni
+            if ($file->getClientOriginalExtension() === 'csv') {
+                Excel::import(new ClassMajorImport, $file, null, \Maatwebsite\Excel\Excel::CSV);
+            } else {
+                Excel::import(new ClassMajorImport, $file);
+            }
+
+            return redirect()->back()->with('success', '✨ Data jurusan baru dan rombel kelas berhasil disinkronisasi massal!');
+
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorPesan = '<strong>Gagal Import Kelas! Periksa baris data berikut:</strong><br>';
+            
+            foreach ($failures as $failure) {
+                $errorPesan .= '• Baris ke-' . $failure->row() . ': ' . implode(', ', $failure->errors()) . '<br>';
+            }
+            
+            return redirect()->back()->with('error', $errorPesan);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', '⚠ Gagal memproses data. Pastikan format penulisan header kolom sesuai dengan template!');
+        }
+    }
+
+    /**
+     * 🚀 FITUR BARU: Mengunduh Template CSV Gabungan Kelas & Jurusan
+     */
+   /**
+     * 🚀 FITUR TEMPLATE RAPI: Mengunduh Template CSV Gabungan Kelas & Jurusan
+     * Sudah dilengkapi dengan instruksi pemisah kolom otomatis untuk Excel (Anti-Dempet)
+     */
+    public function downloadTemplateGabungan()
+    {
+        $namaFile = "template_kelas_jurusan_sebstar.csv";
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename={$namaFile}",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['nama_kelas', 'singkatan_jurusan', 'nama_jurusan'];
+
+        $callback = function() use($columns) {
+            $file = fopen('php://output', 'w');
+            
+            // 🛠️ TRICK 1: Kirimkan UTF-8 BOM agar Excel mengenali karakter dengan benar
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); 
+            
+            // 🛠️ TRICK 2: Kunci utama anti-dempet! Beritahu Excel secara paksa untuk menggunakan pembatas koma (,)
+            fwrite($file, "sep=,\n");
+            
+            // Tulis baris judul kolom (Header)
+            fputcsv($file, $columns, ',');
+            
+            // Tulis contoh baris template pengisian data master untuk panduan proktor sekolah
+            fputcsv($file, ['XII RPL', 'RPL', 'Rekayasa Perangkat Lunak'], ',');
+            fputcsv($file, ['XII AKL', 'AKL', 'Akuntansi dan Keuangan Lembaga'], ',');
+            fputcsv($file, ['XII ATPH 2', 'ATPH', 'Agribisnis Tanaman Pangan dan Hortikultura'], ',');
+            
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }
