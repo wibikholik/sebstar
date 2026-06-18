@@ -182,11 +182,7 @@ export default function ProfileScreen() {
             <Text style={styles.infoValueDisabled}>{user?.classroom?.nama_kelas ?? 'XII RPL'}</Text>
           </View>
 
-          <View style={[styles.infoRowDisabled, { borderBottomWidth: 0 }]}>
-            <Ionicons name="phone-portrait-outline" size={20} color="#94a3b8" />
-            <Text style={styles.infoLabelDisabled}>Device Status:</Text>
-            <Text style={[styles.infoValueDisabled, {color: '#10b981', fontWeight: '800'}]}>TERVERIFIKASI</Text>
-          </View>
+          
 
         </View>
 

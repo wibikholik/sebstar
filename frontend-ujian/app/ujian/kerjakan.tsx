@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import { 
   View, 
   Text, 
@@ -9,328 +9,44 @@ import {
   Image, 
   ScrollView, 
   Modal, 
-  Alert, 
   StatusBar, 
   SafeAreaView, 
   Dimensions, 
   Animated, 
-  Platform, 
-  AppState, 
-  BackHandler 
+  Platform 
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
-import api from '../../src/api/axiosConfig';
 import { Ionicons } from '@expo/vector-icons';
-import * as ScreenCapture from 'expo-screen-capture';
-import { Audio } from 'expo-av';
-import Pusher from 'pusher-js';
+import { useKerjakanLogic } from '../../hooks/useKerjakanLogic'; // Sesuaikan path folder hooks Anda
 
 const { width } = Dimensions.get('window');
+const primaryRed = '#c91313';
 
 export default function KerjakanScreen() {
   const { id, token } = useLocalSearchParams();
   const router = useRouter();
   const navigation = useNavigation();
-  
-  // STATE SOAL & JAWABAN
-  const [soal, setSoal] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [studentId, setStudentId] = useState(null);
-  
-  // STATE KEAMANAN & TIMER
-  const [timeLeft, setTimeLeft] = useState(0);
-  const soundRef = useRef(null); 
-  const soundIntervalRef = useRef(null); // Reference untuk mengontrol batas putaran suara
-  const appState = useRef(AppState.currentState);
-  const timerRef = useRef(null);
-  const pusherRef = useRef(null);
-  const violationTriggered = useRef(false);
 
-  // ANIMASI SIDE NAV
-  const [sideNavVisible, setSideNavVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-width)).current;
-
-  // PERBAIKAN URL GAMBAR:
-  const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-  // Menghapus "/api" dari BASE_URL khusus untuk memuat gambar dari storage
-  const ASSET_URL = BASE_URL ? BASE_URL.replace(/\/api$/, '') : ''; 
-  const REVERB_KEY = process.env.EXPO_PUBLIC_REVERB_KEY;
-  const primaryRed = '#c91313';
-
-  const getWsHost = () => {
-    if (!BASE_URL) return 'localhost';
-    const matches = BASE_URL.match(/\/\/([^:]+)/);
-    return matches ? matches[1] : 'localhost';
-  };
-
-  // --- 1. FUNGSI ALARM PERINGATAN (DIBATASI MAKSIMAL 2 KALI PUTARAN) ---
-  async function playWarningSound() {
-    try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-      if (soundIntervalRef.current) {
-        clearInterval(soundIntervalRef.current);
-      }
-
-      let playCount = 0;
-
-      const triggerAudioPlay = async () => {
-        if (playCount >= 2) {
-          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-          await stopWarningSound();
-          return;
-        }
-
-        try {
-          const { sound: newSound } = await Audio.Sound.createAsync(
-             require('../../assets/sounds/alert.mp3'),
-             { shouldPlay: true, isLooping: false, volume: 1.0 }
-          );
-          soundRef.current = newSound;
-          playCount++;
-          console.log(`🔊 Alarm berbunyi ke-${playCount} kali.`);
-        } catch (err) {
-          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-          console.log("Gagal memicu play audio internal:", err);
-        }
-      };
-
-      await triggerAudioPlay();
-
-      soundIntervalRef.current = setInterval(async () => {
-        await triggerAudioPlay();
-      }, 2500);
-
-    } catch (e) {
-      console.log("Gagal memutar suara alarm background:", e);
-    }
-  }
-
-  async function stopWarningSound() {
-    if (soundIntervalRef.current) {
-      clearInterval(soundIntervalRef.current);
-      soundIntervalRef.current = null;
-    }
-    if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-        console.log("🔇 Alarm berhasil dihentikan total.");
-      } catch (e) {
-        console.log("Gagal mematikan suara alarm:", e);
-      }
-    }
-  }
-
-  // --- 2. LOGIKA UTAMA EKSEKUSI HUKUMAN DISKUALIFIKASI ---
-  const eksekusiDiskualifikasi = async (alasan) => {
-    if (violationTriggered.current || isSubmitted) return;
-    violationTriggered.current = true;
-
-    console.log(`🛑 Tindakan Kecurangan Terdeteksi: ${alasan}`);
-    
-    await playWarningSound();
-
-    try {
-      await api.post(`/ujian/${id}/log-pelanggaran`, { 
-        type: 'KELUAR_APLIKASI',
-        details: `Siswa melanggar mode ketat: ${alasan}`
-      });
-      if (timerRef.current) clearInterval(timerRef.current);
-      console.log("Log pelanggaran sukses dilaporkan ke database.");
-    } catch (e) { 
-      console.log("Gagal kirim log pelanggaran ke backend:", e.message); 
-    }
-
-    router.replace('/(auth)/login');
-
-    if (Platform.OS === 'web') {
-      window.alert(`DISKUALIFIKASI: ${alasan}`);
-    } else {
-      Alert.alert("🛑 DISKUALIFIKASI SISTEM", `Anda otomatis dikeluarkan dari ruang ujian karena terdeteksi: ${alasan}`);
-    }
-  };
-
-  // --- 3. LOGIKA MONITORING REAL-TIME (WEBSOCKET REVERB) ---
-  useEffect(() => {
-    if (!id || !studentId || !REVERB_KEY) return;
-
-    pusherRef.current = new Pusher(REVERB_KEY, {
-      wsHost: getWsHost(),
-      wsPort: 8080,
-      forceTLS: false,
-      disableStats: true,
-      enabledTransports: ['ws', 'wss']
-    });
-
-    const channel = pusherRef.current.subscribe(`exam-monitoring.${id}`);
-    
-    channel.bind('ExamAktivitas', async (data) => {
-      console.log("Sinyal Real-time masuk ke HP Siswa:", data);
-
-      if (parseInt(data.studentId) === parseInt(studentId)) {
-        if (data.actionType === 'RESET_AKSES') {
-          await stopWarningSound();
-          violationTriggered.current = false; 
-          if (timerRef.current) clearInterval(timerRef.current);
-          
-          Alert.alert(
-            "Akses Dipulihkan", 
-            "Guru pengawas telah mereset status login Anda.",
-            [{ text: "Kembali ke Beranda", onPress: () => router.replace('/(tabs)') }]
-          );
-        } 
-        else if (data.actionType === 'FORCE_SUBMIT') {
-          await stopWarningSound();
-          if (timerRef.current) clearInterval(timerRef.current);
-          setIsSubmitted(true);
-          
-          Alert.alert(
-            "Ujian Selesai Paksa", 
-            "Pengerjaan lembar ujian Anda telah diselesaikan dan dikunci oleh pengawas ruangan.",
-            [{ text: "Lihat Rekap Ujian", onPress: () => router.replace({ pathname: '/ujian/selesai', params: { id, token } }) }]
-          );
-        }
-      }
-    });
-
-    return () => {
-      if (pusherRef.current) {
-        pusherRef.current.unsubscribe(`exam-monitoring.${id}`);
-        pusherRef.current.disconnect();
-      }
-    };
-  }, [id, studentId]);
-
-  // --- 4. ENGINE KEAMANAN (LAPIS BAJA MULTI-DETEKSI) ---
-  useEffect(() => {
-    fetchData();
-
-    if (Platform.OS !== 'web') {
-      ScreenCapture.preventScreenCaptureAsync().catch(() => {});
-    }
-
-    const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
-        eksekusiDiskualifikasi("Membuka laci notifikasi atas, menekan Recent Apps, atau mencoba membelah layar (Split Screen).");
-      }
-      appState.current = nextAppState;
-    });
-
-    const blurSubscription = navigation.addListener('blur', async () => {
-      if (!isSubmitted) {
-        eksekusiDiskualifikasi("Kehilangan fokus layar pengerjaan utama.");
-      }
-    });
-
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
-
-    return () => {
-      appStateSubscription.remove();
-      blurSubscription();
-      backHandler.remove();
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (Platform.OS !== 'web') {
-        ScreenCapture.allowScreenCaptureAsync().catch(() => {});
-      }
-      
-      if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-      if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {});
-      }
-    };
-  }, [id, isSubmitted]);
-
-  // --- 5. HTTP REQUEST AMBIL DATA SOAL & USER PROFILE ---
-  const fetchData = async () => {
-    try {
-      const resSoal = await api.get(`/ujian/${id}/soal`, { headers: { 'X-Exam-Token': token } });
-      setSoal(resSoal.data);
-      
-      const resUser = await api.get('/user'); 
-      setStudentId(resUser.data.id);
-      
-      const resJadwal = await api.get('/jadwal');
-      const currentJadwal = resJadwal.data.data.find((j) => j.id.toString() === id.toString());
-      if (currentJadwal) {
-        const durasiDetik = Number(currentJadwal.durasi) * 60;
-        setTimeLeft(durasiDetik);
-        startTimer(durasiDetik);
-      }
-    } catch (e) { 
-      const errorMsg = e.response?.data?.message || "Token ujian salah atau sesi pengerjaan Anda tidak valid.";
-      if (Platform.OS === 'web') {
-        window.alert("AKSES DITOLAK: " + errorMsg);
-        router.replace('/(tabs)'); 
-      } else {
-        Alert.alert("Akses Ditolak", errorMsg, [{ text: "Kembali", onPress: () => router.replace('/(tabs)') }]);
-      }
-    } finally {
-      setLoading(false); 
-    }
-  };
-
-  const startTimer = (initialTime) => {
-    let time = initialTime;
-    if (timerRef.current) clearInterval(timerRef.current);
-    
-    timerRef.current = setInterval(() => {
-      time -= 1;
-      setTimeLeft(time);
-      if (time <= 0) {
-        clearInterval(timerRef.current);
-        confirmFinish(true); 
-      }
-    }, 1000);
-  };
-
-  const toggleSideNav = (show) => {
-    setSideNavVisible(show);
-    Animated.timing(slideAnim, {
-      toValue: show ? 0 : -width,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleAnswerChange = async (questionId, answer) => {
-    if (isSubmitted || violationTriggered.current) return;
-    setSelectedAnswers((prev) => ({ ...prev, [questionId]: answer }));
-    try {
-      await api.post(`/ujian/${id}/submit-answer`, { 
-        question_id: questionId, 
-        answer: answer 
-      }, { headers: { 'X-Exam-Token': token } });
-    } catch (e) { 
-      console.log("Gagal auto-save jawaban ke server"); 
-    }
-  };
-
-  const confirmFinish = async (isAuto = false) => {
-    setModalVisible(false);
-    await stopWarningSound();
-    try {
-      await api.post(`/ujian/${id}/finish`, {}, { headers: { 'X-Exam-Token': token } });
-      setIsSubmitted(true);
-      if (timerRef.current) clearInterval(timerRef.current);
-      router.replace({ pathname: '/ujian/selesai', params: { id, token } });
-    } catch (e) {
-      const msg = "Koneksi internet bermasalah saat mengirimkan final berkas ujian.";
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Gagal Kirim", msg);
-    }
-  };
-
-  const checkApakahSemuaSudahDikerjakan = () => {
-    if (soal.length === 0) return false;
-    return soal.every(s => selectedAnswers[s.id] && selectedAnswers[s.id].toString().trim() !== '');
-  };
+  // Memanggil semua logic dari Custom Hook
+  const {
+    soal,
+    loading,
+    refreshing,
+    selectedAnswers,
+    modalVisible,
+    setModalVisible,
+    currentIndex,
+    setCurrentIndex,
+    timeLeft,
+    sideNavVisible,
+    slideAnim,
+    ASSET_URL,
+    fetchData,
+    toggleSideNav,
+    handleAnswerChange,
+    confirmFinish,
+    checkApakahSemuaSudahDikerjakan
+  } = useKerjakanLogic(id, token, router, navigation);
 
   if (loading) {
     return (
@@ -362,6 +78,15 @@ export default function KerjakanScreen() {
           </View>
         </View>
 
+        {/* REFRESH MANUAL COMPONENT */}
+        <TouchableOpacity onPress={fetchData} style={{ marginRight: 10 }} disabled={refreshing}>
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="refresh-circle" size={28} color="#fff" />
+          )}
+        </TouchableOpacity>
+
         <View style={styles.timerContainer}>
           <Text style={styles.timerText}>
             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
@@ -376,7 +101,6 @@ export default function KerjakanScreen() {
           
           {currentItem?.question_image && (
             <Image 
-              // SUDAH DIGANTI MENGGUNAKAN ASSET_URL
               source={{ uri: `${ASSET_URL}/storage/${currentItem.question_image}` }} 
               style={styles.image} 
               resizeMode="contain" 
@@ -418,7 +142,7 @@ export default function KerjakanScreen() {
         </View>
       </ScrollView>
 
-      {/* FOOTER NAVIGATION BUTTONS */}
+      {/* FOOTER NAVIGATION */}
       <View style={styles.footer}>
         <TouchableOpacity 
           style={[styles.btnNav, currentIndex === 0 && {opacity: 0.3}]} 
@@ -447,7 +171,7 @@ export default function KerjakanScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* DRAWER MATRIX NOMOR SOAL */}
+      {/* DRAWER MATRIX */}
       {sideNavVisible && <TouchableOpacity style={styles.drawerOverlay} activeOpacity={1} onPress={() => toggleSideNav(false)} />}
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <View style={styles.drawerHeader}><Text style={styles.drawerTitle}>Daftar Navigasi Soal</Text></View>
@@ -467,7 +191,7 @@ export default function KerjakanScreen() {
         </ScrollView>
       </Animated.View>
 
-      {/* POPUP MODAL KONFIRMASI SELESAI */}
+      {/* POPUP MODAL FINISH */}
       <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

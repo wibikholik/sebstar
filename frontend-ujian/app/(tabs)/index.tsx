@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { 
   View, 
   Text, 
@@ -14,149 +14,32 @@ import {
   Platform,
   SafeAreaView
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import api from '../../src/api/axiosConfig'; 
+import { Stack } from 'expo-router'; 
 import { Ionicons } from '@expo/vector-icons';
+import { useDashboardLogic } from '../../hooks/useDashboardLogic'; // Sesuaikan dengan path folder hooks Anda
 
 export default function DashboardScreen() {
-  const [jadwal, setJadwal] = useState([]);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  // STATE MODAL TOKEN INPUT
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedExam, setSelectedExam] = useState(null);
-  const [tokenInput, setTokenInput] = useState('');
-  const [verifying, setVerifying] = useState(false);
-
-  // STATE: CUSTOM ALERT MODAL
-  const [customAlert, setCustomAlert] = useState({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info', // 'info' atau 'konfirmasi'
-    onConfirm: null
-  });
-
-  const router = useRouter();
-  const primaryRed = '#c91313'; // Warna Identitas Sebstar
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const response = await api.get('/jadwal');
-      if (response && response.data) {
-        setJadwal(response.data.data || []);
-        if (response.data.user) {
-          setUser(response.data.user);
-          await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-        }
-      }
-    } catch (error) {
-      console.log("Fetch Error:", error.message);
-      try {
-        const localUser = await AsyncStorage.getItem('userData');
-        if (localUser) setUser(JSON.parse(localUser));
-      } catch (storageErr) {
-        console.log("Gagal ambil storage lokal");
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const executeLogout = async () => {
-    setLoading(true);
-    try {
-      await api.post('/logout'); 
-    } catch (e) {
-      console.log("Bypass API Logout.");
-    } finally {
-      try {
-        await AsyncStorage.removeItem('userToken');
-        await AsyncStorage.removeItem('userData');
-        setModalVisible(false);
-        setCustomAlert(prev => ({ ...prev, visible: false }));
-        router.replace('/(auth)/login');
-      } catch (err) {
-        console.log("Gagal membersihkan storage lokal");
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const bukaAlertKustom = (title, message, type = 'info', onConfirmCallback = null) => {
-    setCustomAlert({
-      visible: true,
-      title: title,
-      message: message,
-      type: type,
-      onConfirm: onConfirmCallback
-    });
-  };
-
-  const handleLogoutPress = () => {
-    bukaAlertKustom(
-      "Keluar Akun", 
-      "Apakah Anda yakin ingin keluar dari akun ujian Anda?", 
-      "konfirmasi", 
-      executeLogout
-    );
-  };
-
-  const formatTanggal = (dateString) => {
-    if (!dateString) return '-';
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      }).format(date);
-    } catch (e) {
-      return dateString;
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
-  const handleOpenTokenModal = (exam) => {
-    setSelectedExam(exam);
-    setTokenInput('');
-    setModalVisible(true);
-  };
-
-  const handleVerifyToken = async () => {
-    if (!tokenInput) {
-      bukaAlertKustom("Validasi Gagal", "Silakan masukkan kode token ujian terlebih dahulu!", "info");
-      return;
-    }
-    
-    setVerifying(true);
-    try {
-      await api.post(`/ujian/${selectedExam.id}/verify-token`, { token: tokenInput });
-      setModalVisible(false);
-      router.push({
-        pathname: '/ujian/petunjuk',
-        params: { id: selectedExam.id, token: tokenInput }
-      });
-    } catch (e) {
-      const msg = e.response?.data?.message || 'Kode token yang Anda masukkan tidak valid.';
-      bukaAlertKustom("Verifikasi Gagal", msg, "info");
-    } finally {
-      setVerifying(false);
-    }
-  };
+  const {
+    jadwal,
+    user,
+    loading,
+    refreshing,
+    modalVisible,
+    setModalVisible,
+    selectedExam,
+    tokenInput,
+    setTokenInput,
+    verifying,
+    customAlert,
+    setCustomAlert,
+    primaryRed,
+    router,
+    onRefresh,
+    handleLogoutPress,
+    formatTanggal,
+    handleOpenTokenModal,
+    handleVerifyToken
+  } = useDashboardLogic();
 
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
@@ -164,18 +47,19 @@ export default function DashboardScreen() {
         <Ionicons name="file-tray-outline" size={40} color="#94a3b8" />
       </View>
       <Text style={styles.emptyTitle}>Belum Ada Jadwal</Text>
-      <Text style={styles.emptySubtitle}>Jadwal ujian aktif atau riwayat pengerjaan Anda akan muncul di sini.</Text>
+      <Text style={styles.emptySubtitle}>Jadwal ujian aktif Anda akan muncul di sini.</Text>
     </View>
   );
 
-  const renderListHeader = () => (
-    <View style={styles.listHeader}>
-      <Text style={styles.listHeaderTitle}>Daftar Ujian Anda</Text>
-      <Text style={styles.listHeaderSubtitle}>Pilih ujian yang tersedia untuk mulai mengerjakan</Text>
-    </View>
-  );
+  // 🛠️ FIX PARSING: Menyesuaikan murni dengan properti "teachers_data" dari JSON Laragon Anda
+  const renderTeacherName = (item: any) => {
+    if (item.teachers_data && Array.isArray(item.teachers_data) && item.teachers_data.length > 0) {
+      return item.teachers_data.map((t: any) => t.name).join(', ');
+    }
+    return item.teacher?.name ?? item.guru_pengampu ?? 'Guru Pengampu';
+  };
 
-  const renderJadwal = ({ item }) => {
+  const renderJadwal = ({ item }: { item: any }) => {
     const isFinished = item.is_finished;
     const isActive = item.status === 'aktif' && !isFinished;
     const themeColor = isFinished ? '#10b981' : (isActive ? primaryRed : '#64748b');
@@ -185,10 +69,41 @@ export default function DashboardScreen() {
       <View style={[styles.card, isActive && styles.cardActive]}>
         <View style={styles.cardMainInfo}>
           <View style={{ flex: 1, paddingRight: 10 }}>
+            {/* NAMA MATA PELAJARAN */}
             <Text style={styles.subjectName} numberOfLines={2}>
               {item.subject?.nama_mapel ?? 'Mata Pelajaran'}
             </Text>
+            
+            {/* BARIS METADATA: KELAS | TIPE UJIAN | GURU */}
+            <View style={styles.metaContainer}>
+              {/* KELAS */}
+              <View style={styles.metaItem}>
+                <Ionicons name="school" size={13} color="#64748b" />
+                <Text style={styles.metaText}>
+                  {item.classroom?.nama_kelas ?? item.kelas ?? '-'}
+                </Text>
+              </View>
+              <View style={styles.metaDivider} />
+              
+              {/* TIPE UJIAN */}
+              <View style={styles.metaItem}>
+                <Ionicons name="bookmark" size={13} color="#64748b" />
+                <Text style={styles.metaText}>
+                  {item.exam_type?.name ?? item.jenis_ujian ?? 'Ujian'}
+                </Text>
+              </View>
+              <View style={styles.metaDivider} />
+
+              {/* GURU PENGAMPU (MENEMBAK TEACHERS_DATA) */}
+              <View style={styles.metaItem}>
+                <Ionicons name="person-circle" size={13} color="#64748b" />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {renderTeacherName(item)}
+                </Text>
+              </View>
+            </View>
           </View>
+          
           <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
             <Text style={[styles.statusBadgeText, { color: themeColor }]}>
               {isFinished ? 'SELESAI' : (item.status ? item.status.toUpperCase() : 'NONAKTIF')}
@@ -242,9 +157,11 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* MENYEMBUNYIKAN HEADER PUTIH ASLI EXPO ROUTER */}
+      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="#c91313" />
       
-      {/* HEADER KOTAK TEGAS SEJAJAR DENGAN KERJAKAN.TSX */}
+      {/* HEADER AKUN UTAMA MERAH KUSTOM */}
       <View style={styles.header}>
         <View style={styles.headerProfile}>
           <View style={styles.avatarCircle}>
@@ -260,6 +177,7 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* BODY BACKGROUND SLATE ORIGINAL */}
       <View style={styles.body}>
         {loading && !refreshing ? (
           <View style={styles.center}>
@@ -271,7 +189,7 @@ export default function DashboardScreen() {
             renderItem={renderJadwal}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.scrollContainer}
-            ListHeaderComponent={jadwal.length > 0 ? renderListHeader : null}
+            ListHeaderComponent={null}
             ListEmptyComponent={renderEmptyList}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -322,7 +240,7 @@ export default function DashboardScreen() {
         </Modal>
       )}
 
-      {/* CUSTOM MODAL ALERT */}
+      {/* CUSTOM ALERT */}
       {customAlert.visible && (
         <Modal animationType="fade" transparent={true} visible={customAlert.visible}>
           <View style={styles.modalOverlay}>
@@ -365,7 +283,6 @@ export default function DashboardScreen() {
           </View>
         </Modal>
       )}
-
     </SafeAreaView>
   );
 }
@@ -373,9 +290,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  body: { flex: 1 }, 
-  
-  // HEADER KOTAK TEGAS SEJAJAR DENGAN KERJAKAN.TSX (TANPA BORDER RADIUS KELENGKUNGAN)
+  body: { flex: 1, backgroundColor: '#f8fafc' }, 
   header: { 
     backgroundColor: '#c91313', 
     height: 75,
@@ -391,14 +306,7 @@ const styles = StyleSheet.create({
   welcomeText: { color: '#fca5a5', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   userNameText: { color: '#ffffff', fontSize: 16, fontWeight: '800', marginTop: 2 },
   logoutIconButton: { padding: 5, width: 35 },
-
-  // SCROLL CONTAINER
-  scrollContainer: { padding: 20, paddingBottom: 50 },
-  listHeader: { marginBottom: 15 },
-  listHeaderTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
-  listHeaderSubtitle: { fontSize: 12, color: '#64748b', marginTop: 2 },
-
-  // KARTU UJIAN PREMIUM (SAMA SEPERTI CARD SOAL)
+  scrollContainer: { padding: 20, paddingTop: 20, paddingBottom: 50 },
   card: { 
     backgroundColor: '#fff', 
     padding: 20, 
@@ -406,7 +314,7 @@ const styles = StyleSheet.create({
     elevation: 3, 
     shadowColor: '#000', 
     shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.05, 
+    shadowOpacity: 0.05,   
     shadowRadius: 3, 
     marginBottom: 15,
     borderWidth: 1,
@@ -415,44 +323,43 @@ const styles = StyleSheet.create({
   cardActive: { 
     borderColor: '#fca5a5',
     backgroundColor: '#fffdfd',
-    borderLeftWidth: 4,
-    borderLeftColor: '#c91313'
+    borderLeftWidth: 5,
+    borderLeftColor: '#c91313' 
   },
   cardMainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
   subjectName: { fontSize: 17, fontWeight: '700', color: '#1e293b', lineHeight: 24 },
+  
+  // METADATA GRID STYLING
+  metaContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap', gap: 2 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 },
+  metaText: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  metaDivider: { width: 1, height: 12, backgroundColor: '#cbd5e1', marginHorizontal: 6 },
+
   statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   statusBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  
   cardDetailsRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
   detailItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   detailIconBox: { backgroundColor: '#f1f5f9', padding: 6, borderRadius: 8 },
   detailText: { fontSize: 13, color: '#475569', fontWeight: '600' },
-  
   actionButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 14, borderRadius: 14, gap: 8 },
   actionButtonText: { fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
   btnActive: { backgroundColor: '#c91313' },
   btnFinished: { backgroundColor: '#1e293b' },
   btnInactive: { backgroundColor: '#f1f5f9' },
-
-  // EMPTY STATE
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 80 },
   emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
   emptySubtitle: { fontSize: 13, color: '#64748b', textAlign: 'center', marginTop: 6, paddingHorizontal: 30, lineHeight: 20 },
-
-  // MODAL & ALERT (Rounded 20 seperti card soal)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', backgroundColor: '#ffffff', borderRadius: 20, padding: 25, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
   modalSubTitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 22 },
   closeBtn: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 10 },
-  
   tokenWrapper: { backgroundColor: '#f8fafc', borderRadius: 15, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 },
   tokenInput: { padding: 15, fontSize: 24, fontWeight: '800', textAlign: 'center', letterSpacing: 8, color: '#c91313' },
   modalBtn: { backgroundColor: '#c91313', padding: 15, borderRadius: 15, alignItems: 'center' },
   modalBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14, letterSpacing: 0.5 },
-
   customAlertCard: { width: '90%', backgroundColor: '#ffffff', padding: 25, borderRadius: 20, alignItems: 'center', elevation: 10 },
   alertIconWrapper: { padding: 12, borderRadius: 50, marginBottom: 15 },
   customAlertTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 8, textAlign: 'center' },
