@@ -156,7 +156,7 @@ class UserController extends Controller
     }
 
     /**
-     * 🚀 FITUR FIX: Memproses Import Excel/CSV secara aman tanpa kebocoran SQL Error
+     * 🚀 Memproses Import Excel/CSV secara aman tanpa kebocoran SQL Error
      */
     public function importExcel(Request $request)
     {
@@ -170,7 +170,7 @@ class UserController extends Controller
         try {
             $file = $request->file('file_excel');
 
-            // Jika eksetensi file murni .csv, paksa baca sebagai CSV murni
+            // Jika ekstensi file murni .csv, paksa baca sebagai CSV murni
             if ($file->getClientOriginalExtension() === 'csv') {
                 Excel::import(new UsersImport, $file, null, \Maatwebsite\Excel\Excel::CSV);
             } else {
@@ -194,11 +194,12 @@ class UserController extends Controller
     }
 
     /**
-     * Mengunduh Template CSV Contoh untuk Admin
+     * 🚀 FITUR TEMPLATE RAPI: Mengunduh Template CSV Contoh untuk Admin
+     * Desain kolom bersih, kapitalisasi rapi, & instruksi pemisah otomatis (Anti-Dempet)
      */
     public function downloadTemplate()
     {
-        $namaFile = "template_pengguna_sebstar.csv";
+        $namaFile = "template_import_pengguna_sebstar.csv";
 
         $headers = [
             "Content-type"        => "text/csv; charset=UTF-8",
@@ -208,20 +209,25 @@ class UserController extends Controller
             "Expires"             => "0"
         ];
 
-        $columns = ['name', 'email', 'password', 'role', 'nomor_induk', 'nama_kelas', 'nama_mapel'];
+        // Format nama kolom yang jelas bagi pengguna manusia (Proktor/Admin)
+        $columns = ['Name', 'Email', 'Password', 'Role', 'Nomor Induk', 'Nama Kelas', 'Nama Mapel'];
 
         $callback = function() use($columns) {
             $file = fopen('php://output', 'w');
             
-            // Mengirimkan tanda pengenal UTF-8 BOM agar Excel rapi saat membuka file csv
+            // 🛠️ TRICK 1: Mengirimkan tanda pengenal UTF-8 BOM agar Excel membaca jenis font & simbol dengan pas
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
             
-            fputcsv($file, $columns);
+            // 🛠️ TRICK 2: Kunci anti-dempet! Memaksa Excel memecah baris data langsung ke kolom masing-masing
+            fwrite($file, "sep=,\n");
             
-            // Contoh baris template pengisian data master
-            fputcsv($file, ['Ahmad Siswa', 'ahmad@sebstar.com', 'rahasia123', 'siswa', '10224001', 'XI-RPL-1', '']);
-            fputcsv($file, ['Budi Guru', 'budi@sebstar.com', 'passwordguru', 'guru', '1988010202', '', 'Matematika']);
-            fputcsv($file, ['Siti Pengawas', 'siti@sebstar.com', 'passwordpw', 'pengawas', '1992050301', '', '']);
+            // Tulis Header Resmi
+            fputcsv($file, $columns, ',');
+            
+            // Contoh baris template pengisian data master riil yang mudah dipahami proktor
+            fputcsv($file, ['Ahmad Siswa', 'ahmad@sebstar.com', 'rahasia123', 'siswa', '10224001', 'XII RPL 1', ''], ',');
+            fputcsv($file, ['Budi Guru', 'budi@sebstar.com', 'passwordguru', 'guru', '1988010202', '', 'Pemrograman Berorientasi Objek'], ',');
+            fputcsv($file, ['Siti Pengawas', 'siti@sebstar.com', 'passwordpw', 'pengawas', '1992050301', '', ''], ',');
             
             fclose($file);
         };

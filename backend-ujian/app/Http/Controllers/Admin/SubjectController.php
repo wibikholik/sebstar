@@ -66,7 +66,7 @@ class SubjectController extends Controller
         try {
             $file = $request->file('file_excel');
 
-            // 🛠️ PERBAIKAN 1: Deteksi jika file adalah CSV murni, paksa pembacaan sebagai CSV murni
+            // Deteksi jika file adalah CSV murni, paksa pembacaan sebagai CSV murni
             if ($file->getClientOriginalExtension() === 'csv') {
                 Excel::import(new SubjectImport, $file, null, \Maatwebsite\Excel\Excel::CSV);
             } else {
@@ -87,31 +87,41 @@ class SubjectController extends Controller
     }
 
     /**
-     * Mengunduh Template CSV Contoh untuk Admin
+     * 🚀 FITUR TEMPLATE RAPI: Mengunduh Template CSV Contoh untuk Admin
+     * Sudah dilengkapi instruksi pembatas kolom otomatis untuk Excel (Anti-Dempet)
      */
     public function downloadTemplate()
     {
-        // 🛠️ PERBAIKAN 2: Ubah Header dan Extention menjadi .csv agar sesuai dengan isi fputcsv
+        $namaFile = "template_import_mata_pelajaran_sebstar.csv";
+
         $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="template_mata_pelajaran.csv"',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$namaFile}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0'
         ];
 
         return response()->streamDownload(function() {
             $file = fopen('php://output', 'w');
             
-            // Mengirimkan BOM UTF-8 agar Excel tidak berantakan saat membuka tanda baca/karakter unik
+            // 🛠️ TRICK 1: Mengirimkan BOM UTF-8 agar Excel membaca karakter font Indonesia dengan pas
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
-            // Baris 1: Header Excel (Sesuai dengan key $row di SubjectImport)
-            fputcsv($file, ['kode_mapel', 'nama_mapel']);
+            // 🛠️ TRICK 2: Memaksa Microsoft Excel/WPS langsung memecah data ke kolom tersendiri (Anti-Dempet)
+            fwrite($file, "sep=,\n");
+
+            // Header yang manusiawi & jelas bagi pengguna proktor/admin sekolah
+            fputcsv($file, ['Kode Mapel', 'Nama Mapel'], ',');
             
-            // Baris 2 & 3: Contoh data pengisian
-            fputcsv($file, ['MAT-01', 'Matematika Wajib']);
-            fputcsv($file, ['ING-02', 'Bahasa Inggris Tingkat Lanjut']);
+            // Contoh baris template data pengisian riil sekolah
+            fputcsv($file, ['MAT-01', 'Matematika Wajib'], ',');
+            fputcsv($file, ['ING-02', 'Bahasa Inggris Tingkat Lanjut'], ',');
+            fputcsv($file, ['RPL-03', 'Pemrograman Berorientasi Objek'], ',');
+            fputcsv($file, ['IND-04', 'Bahasa Indonesia'], ',');
             
             fclose($file);
-        }, 'template_mata_pelajaran.csv', $headers);
+        }, $namaFile, $headers);
     }
 
     /**

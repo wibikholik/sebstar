@@ -30,7 +30,7 @@ class QuestionController extends Controller
         $request->validate([
             'type'           => 'required|in:pg,essay',
             'question_text'  => 'required',
-            'question_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048', // Mendukung tipe gambar modern webp
+            'question_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048', 
         ]);
 
         $schedule = Schedule::findOrFail($schedule_id);
@@ -63,48 +63,78 @@ class QuestionController extends Controller
     }
 
     /**
-     * 🚀 FITUR BARU: Memproses File Excel/CSV yang di-upload oleh Admin/Guru
+     * 🚀 Memproses File Excel/CSV yang di-upload oleh Admin/Guru
+     * Sudah diproteksi dari kendala Zip Reader jika user mengunggah file CSV murni
      */
     public function importExcel(Request $request, $schedule_id)
     {
         $request->validate([
-            'file_excel' => 'required|mimes:xlsx,xls,csv|max:5120', // Maks file 5MB
+            'file_excel' => 'required|file|mimes:xlsx,xls,csv,txt|max:5120', // Maks file 5MB
+        ], [
+            'file_excel.required' => 'Pilih berkas template soal terlebih dahulu!',
+            'file_excel.mimes'    => 'Format file harus berupa .xlsx, .xls, atau .csv!',
         ]);
 
         try {
-            // Panggil file QuestionsImport sambil melempar ID Jadwal aktif
-            Excel::import(new QuestionsImport($schedule_id), $request->file('file_excel'));
+            $file = $request->file('file_excel');
+
+            // Cek jika ekstensi file adalah csv, paksa pembacaan sebagai CSV murni
+            if ($file->getClientOriginalExtension() === 'csv') {
+                Excel::import(new QuestionsImport($schedule_id), $file, null, \Maatwebsite\Excel\Excel::CSV);
+            } else {
+                Excel::import(new QuestionsImport($schedule_id), $file);
+            }
             
             return redirect()->back()->with('success', '✅ Berhasil mengimpor bank soal massal ke jadwal ujian ini!');
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorPesan = '<strong>Gagal Import Soal! Periksa baris berikut:</strong><br>';
+            
+            foreach ($failures as $failure) {
+                $errorPesan .= '• Baris ke-' . $failure->row() . ': ' . implode(', ', $failure->errors()) . '<br>';
+            }
+            
+            return redirect()->back()->with('error', $errorPesan);
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', '⚠ Gagal memproses berkas. Pastikan struktur kolom sesuai template! Info: ' . $e->getMessage());
+            return redirect()->back()->with('error', '⚠ Gagal memproses data. Pastikan format penulisan header kolom sesuai dengan template!');
         }
     }
 
     /**
-     * 📥 FITUR BARU: Mengunduh format template CSV Manusiawi (Teks murni) tanpa kode ID membingungkan
+     * 📥 FITUR TEMPLATE RAPI: Mengunduh format template CSV Manusiawi (Teks murni) tanpa kode ID membingungkan
+     * Sudah dilengkapi instruksi pemisah otomatis untuk Excel (Anti-Dempet)
      */
     public function downloadTemplate()
     {
+        $namaFile = "template_import_soal_sebstar.csv";
+
         $headers = [
             "Content-type"        => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=template_soal_sebstar.csv",
+            "Content-Disposition" => "attachment; filename={$namaFile}",
             "Pragma"              => "no-cache",
             "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
             "Expires"             => "0"
         ];
 
-        // Header kolom wajib disesuaikan 100% dengan properti $fillable di model Question.php kamu
-        $columns = ['type', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_answer'];
+        // Format Kolom Manusiawi (Huruf Kapital Awalan, dengan Spasi, Tanpa Underscore)
+        $columns = ['Type', 'Question Text', 'Option A', 'Option B', 'Option C', 'Option D', 'Option E', 'Correct Answer'];
 
         $callback = function() use($columns) {
             $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
             
-            // Baris Baris Contoh Isian Template (Opsi sampai E, Kunci Kapital)
-            fputcsv($file, ['pg', 'Berapakah hasil matematika dari operasi 10 + 5?', '12', '13', '14', '15', '16', 'D']);
-            fputcsv($file, ['pg', 'Sistem operasi mobile open-source buatan Google adalah...', 'iOS', 'Android', 'Windows Phone', 'Linux Mint', 'Ubuntu Touch', 'B']);
-            fputcsv($file, ['essay', 'Jelaskan dampak buruk terjadinya pencemaran sungai bagi ekosistem sekitar!', '', '', '', '', '', '']);
+            // 🛠️ TRICK 1: Kirimkan UTF-8 BOM agar Excel mengenali simbol, tanda tanya, dan font teks dengan benar
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); 
+            
+            // 🛠️ TRICK 2: Kunci utama anti-dempet! Memaksa Microsoft Excel/WPS langsung memecah kolom otomatis
+            fwrite($file, "sep=,\n");
+            
+            // Tulis Header Resmi
+            fputcsv($file, $columns, ',');
+            
+            // Baris Contoh Isian Template (Opsi sampai E, Kunci Kapital)
+            fputcsv($file, ['pg', 'Berapakah hasil matematika dari operasi 10 + 5?', '12', '13', '14', '15', '16', 'D'], ',');
+            fputcsv($file, ['pg', 'Sistem operasi mobile open-source buatan Google adalah...', 'iOS', 'Android', 'Windows Phone', 'Linux Mint', 'Ubuntu Touch', 'B'], ',');
+            fputcsv($file, ['essay', 'Jelaskan dampak buruk terjadinya pencemaran sungai bagi ekosistem sekitar!', '', '', '', '', '', ''], ',');
             
             fclose($file);
         };
@@ -181,7 +211,7 @@ class QuestionController extends Controller
         
         // Bersihkan berkas fisik gambar di folder storage sebelum record database dihapus
         if ($question->question_image && Storage::disk('public')->exists($question->question_image)) {
-            Storage::disk('public')->delete($question->question_image);
+            $question->deleteImage();
         }
         
         $question->delete();
